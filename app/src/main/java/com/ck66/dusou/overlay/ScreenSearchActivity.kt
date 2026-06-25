@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
 
 class ScreenSearchActivity : ComponentActivity() {
 
-    private val captureManager = ScreenCaptureManager()
+    private val captureManager get() = ScreenCaptureManager.instance
     private lateinit var viewModel: ScreenSearchViewModel
     private var resultWindow: OverlayResultWindow? = null
 
@@ -154,9 +154,9 @@ class ScreenSearchActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (isFinishing) {
-            captureManager.stopCapture()
-        }
+        // 不在 onDestroy 中停止 captureManager
+        // MediaProjection 和 VirtualDisplay 由 ScreenCaptureManager（单例）跨 Activity 生命周期持有
+        // 否则会导致 ScreenCaptureService（FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION）因 MediaProjection 被释放而闪退
         super.onDestroy()
     }
 

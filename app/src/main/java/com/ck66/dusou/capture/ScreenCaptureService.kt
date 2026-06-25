@@ -11,6 +11,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.ck66.dusou.MainActivity
 import com.ck66.dusou.R
+import com.ck66.dusou.overlay.ScreenCaptureManager
 
 class ScreenCaptureService : Service() {
 
@@ -49,6 +50,11 @@ class ScreenCaptureService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        ScreenCaptureManager.instance.stopCapture()
+        super.onDestroy()
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

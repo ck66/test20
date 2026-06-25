@@ -17,7 +17,11 @@ import android.util.DisplayMetrics
 import android.view.Surface
 import java.nio.ByteBuffer
 
-class ScreenCaptureManager {
+class ScreenCaptureManager private constructor() {
+
+    companion object {
+        val instance: ScreenCaptureManager by lazy { ScreenCaptureManager() }
+    }
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null

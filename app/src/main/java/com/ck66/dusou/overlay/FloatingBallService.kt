@@ -25,6 +25,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationCompat
 import com.ck66.dusou.MainActivity
 import com.ck66.dusou.R
+import com.ck66.dusou.capture.ScreenCaptureService
 import com.ck66.dusou.ui.theme.md_theme_light_primary
 
 class FloatingBallService : Service() {
@@ -74,7 +75,10 @@ class FloatingBallService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        clickCallback = null
         removeFloatingBall()
+        ScreenCaptureManager.instance.stopCapture()
+        stopService(Intent(this, ScreenCaptureService::class.java))
         super.onDestroy()
     }
 

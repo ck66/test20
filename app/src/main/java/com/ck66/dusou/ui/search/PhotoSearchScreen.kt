@@ -1,11 +1,15 @@
 package com.ck66.dusou.ui.search
 
+import android.Manifest
 import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -172,6 +176,30 @@ private fun CameraPreviewContent(
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
 
+    // Camera permission handling
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasCameraPermission = granted
+        if (!granted) {
+            Toast.makeText(context, "需要相机权限才能拍照搜题", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Request camera permission on first composition if not granted
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     Box(modifier = modifier.fillMaxWidth()) {
         if (capturedBitmap != null) {
             // Show captured photo preview
@@ -202,6 +230,40 @@ private fun CameraPreviewContent(
                     onRetake = onRetake
                 )
             }
+        } else if (!hasCameraPermission) {
+            // Show permission request UI
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Camera,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                    Text(
+                        text = "需要相机权限",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "请授予相机权限以使用拍照搜题功能",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }
+                    ) {
+                        Text("授予权限")
+                    }
+                }
+            }
         } else {
             // Show live camera preview
             Box(
@@ -209,7 +271,9 @@ private fun CameraPreviewContent(
             ) {
                 AndroidView(
                     factory = { ctx ->
-                        val view = PreviewView(ctx).also { previewView = it }
+                        val view = PreviewView(ctx).apply {
+                            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                        }.also { previewView = it }
                         val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
 
                         val executor = Executors.newSingleThreadExecutor()
