@@ -23,9 +23,13 @@ class MlKitOcrEngine(context: Context) : OcrEngine {
             recognizer.process(inputImage)
                 .addOnSuccessListener { visionText ->
                     val blocks = visionText.textBlocks.map { block ->
+                        val blockLines = block.lines
+                        val blockConfidence = if (blockLines.isNotEmpty()) {
+                            blockLines.mapNotNull { it.confidence }.average().toFloat()
+                        } else 0f
                         OcrBlock(
                             text = block.text,
-                            confidence = block.confidence ?: 0f,
+                            confidence = blockConfidence,
                             rect = block.boundingBox?.let { box ->
                                 Rect(box.left, box.top, box.right, box.bottom)
                             }
