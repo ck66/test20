@@ -6,7 +6,7 @@ object OcrEngineProvider {
     private var engine: OcrEngine? = null
 
     fun init(context: Context) {
-        engine = MlKitOcrEngine(context.applicationContext)
+        engine = PaddleOcrEngine(context.applicationContext)
     }
 
     fun get(): OcrEngine {

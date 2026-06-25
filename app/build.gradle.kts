@@ -16,6 +16,10 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -93,6 +97,11 @@ dependencies {
 
     // ML Kit (OCR)
     implementation(libs.mlkit.text.recognition.chinese)
+
+    // PaddleOCR SDK
+    implementation(project(":ppocr-sdk"))
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.21.1")
+    implementation("com.quickbirdstudios:opencv:4.5.3")
 
     // Debug
     debugImplementation(libs.compose.ui.tooling)

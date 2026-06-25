@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "读屏搜题"
 include(":app")
+include(":ppocr-sdk")

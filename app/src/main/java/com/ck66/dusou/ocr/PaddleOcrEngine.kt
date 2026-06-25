@@ -2,19 +2,62 @@ package com.ck66.dusou.ocr
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Rect
+import com.paddle.ocr.PaddleOCR
+import com.paddle.ocr.PaddleOCRConfig
+import com.paddle.ocr.util.OpenCVUtils
+import java.io.ByteArrayOutputStream
 
-/**
- * PaddleOCR 引擎占位实现。
- * TODO: 集成 PaddleOCR AAR 后替换 MlKitOcrEngine。
- *       PaddleOCR v6 离线识别、不依赖网络，适合读屏搜题场景。
- */
 class PaddleOcrEngine(context: Context) : OcrEngine {
 
+    private val ocr: PaddleOCR
+
+    init {
+        OpenCVUtils.init(context)
+        ocr = PaddleOCR.create(
+            context = context,
+            config = PaddleOCRConfig(
+                detThresh = 0.3f,
+                detBoxThresh = 0.6f,
+            ),
+            detModelAssetPath = "models/det/inference.onnx",
+            recModelAssetPath = "models/rec/inference.onnx",
+            recConfigAssetPath = "models/rec/inference.yml",
+        )
+    }
+
     override suspend fun recognize(bitmap: Bitmap): OcrResult {
-        throw NotImplementedError("PaddleOCR AAR not yet integrated")
+        val stream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+        val imageBytes = stream.toByteArray()
+
+        val result = ocr.recognize(imageBytes)
+
+        return OcrResult(
+            text = result.results.joinToString("\n") { it.text },
+            confidence = if (result.results.isNotEmpty()) {
+                result.results.map { it.confidence }.average().toFloat()
+            } else 0f,
+            blocks = result.results.map { item ->
+                val rect = if (item.box.points.size == 4) {
+                    val pts = item.box.points
+                    val left = pts.minOf { it.x }.toInt().coerceAtLeast(0)
+                    val top = pts.minOf { it.y }.toInt().coerceAtLeast(0)
+                    val right = pts.maxOf { it.x }.toInt()
+                    val bottom = pts.maxOf { it.y }.toInt()
+                    Rect(left, top, right, bottom)
+                } else null
+
+                OcrBlock(
+                    text = item.text,
+                    confidence = item.confidence,
+                    rect = rect
+                )
+            }
+        )
     }
 
     override fun release() {
-        // No resources to release yet
+        ocr.release()
     }
 }
