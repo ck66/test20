@@ -3,6 +3,7 @@ package com.ck66.dusou.ocr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
+import com.paddle.ocr.EngineConfig
 import com.paddle.ocr.PaddleOCR
 import com.paddle.ocr.PaddleOCRConfig
 import com.paddle.ocr.util.OpenCVUtils
@@ -20,6 +21,7 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
                     detThresh = 0.3f,
                     detBoxThresh = 0.6f,
                 ),
+                engineConfig = EngineConfig(),
                 detModelAssetPath = "models/det/inference.onnx",
                 recModelAssetPath = "models/rec/inference.onnx",
                 recConfigAssetPath = "models/rec/inference.yml",
