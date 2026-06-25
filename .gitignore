@@ -1,0 +1,32 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# App build outputs
+/app/build
+/app/release
+
+# Keystore files
+*.jks
+*.keystore
+*.p12
+*.key
+keystore.properties
+
+# Gradle
+/gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+*.iml
+/.idea
+/android/r8.jar
+
+# OS X
+.DS_Store

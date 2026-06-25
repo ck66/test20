@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Magnifying glass circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,36C35.163,36 28,43.163 28,52C28,60.837 35.163,68 44,68C47.947,68 51.569,66.602 54.485,64.285L66.485,76.285L69.515,73.715L57.515,61.715C59.5,59.036 60.667,55.674 60.667,52C60.667,43.163 53.504,36 44.667,36L44,36Z"/>
+    <!-- Book -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,40h28v4h-28zM40,48h28v4h-28zM40,56h20v4h-20z"/>
+</vector>

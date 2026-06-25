@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">读屏搜题</string>
+    <string name="tab_search">搜题</string>
+    <string name="tab_bank">题库</string>
+    <string name="tab_profile">我的</string>
+    <string name="screen_capture_notification">读屏搜题正在运行</string>
+    <string name="btn_screen_search">读屏搜题</string>
+    <string name="btn_photo_search">拍照搜题</string>
+    <string name="btn_import_bank">导入题库</string>
+    <string name="btn_search_question">搜索题目</string>
+    <string name="btn_bank_practice">题库练习</string>
+</resources>
