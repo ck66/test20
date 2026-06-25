@@ -129,7 +129,7 @@ private fun OverlayResultContent(
     onDismiss: () -> Unit
 ) {
     val question = matchResult.question
-    var analysisExpanded by mutableStateOf(false)
+    var analysisExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
