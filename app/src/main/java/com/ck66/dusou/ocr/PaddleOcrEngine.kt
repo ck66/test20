@@ -97,9 +97,7 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
     }
 
     override suspend fun release() {
-        synchronized(initLock) {
-            ocr?.release()
-        }
+        ocr?.release()
         ocr = null
     }
 }
