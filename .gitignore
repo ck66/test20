@@ -20,9 +20,6 @@ local.properties
 *.key
 keystore.properties
 
-# Gradle
-/gradle/wrapper/gradle-wrapper.jar
-
 # IDE
 *.iml
 /.idea
