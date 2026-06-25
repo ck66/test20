@@ -23,8 +23,7 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
-DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
-
+# Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD="maximum"
 
 warn () {
@@ -38,36 +37,33 @@ die () {
     exit 1
 } >&2
 
+# OS specific support
 OS_NAME="`uname`"
 case "$OS_NAME" in
-    CYGWIN* | MINGW* | MSYS* )
-        IS_WINDOWS=true
+    CYGWIN* | MINGW* )
+        IS_CYGWIN=true
         ;;
 esac
 
-CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-
-JAVACMD="java"
-if [ -n "$JAVA_HOME" ] ; then
-    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-        JAVACMD="$JAVA_HOME/jre/sh/java"
+# Determine the Java command to use to start the JVM.
+if [ -z "$JAVACMD" ] ; then
+    if [ -n "$JAVA_HOME" ] ; then
+        if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+            JAVACMD="$JAVA_HOME/jre/sh/java"
+        else
+            JAVACMD="$JAVA_HOME/bin/java"
+        fi
     else
-        JAVACMD="$JAVA_HOME/bin/java"
+        JAVACMD="java"
     fi
 fi
+
 if [ ! -x "$JAVACMD" ] ; then
-    die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
-
-Please set the JAVA_HOME variable in your environment to match the
-location of your Java installation."
-fi
-
-if [ -n "$IS_WINDOWS" ] ; then
-    JAVACMD="java"
+    die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
 fi
 
 # Increase the maximum file descriptors if we can.
-if [ "$MAX_FD" = "maximum" -a "$OS_NAME" != "CYGWIN" -a "$OS_NAME" != "MSYS" ] ; then
+if [ "$MAX_FD" = "maximum" -a "$OS_NAME" != "CYGWIN" ] ; then
     MAX_FD_LIMIT=`ulimit -H -n`
     if [ $? -eq 0 ] ; then
         if [ "$MAX_FD" = "maximum" -o "$MAX_FD" = "max" ] ; then
@@ -82,19 +78,9 @@ if [ "$MAX_FD" = "maximum" -a "$OS_NAME" != "CYGWIN" -a "$OS_NAME" != "MSYS" ] ;
     fi
 fi
 
-# Split up the JVM_OPTS And GRADLE_OPTS values into an array
-eval splitJvmOpts() {
-    JVM_OPTS=()
-    while [ $# -gt 0 ] ; do
-        JVM_OPTS="$JVM_OPTS $1"
-        shift
-    done
-}
-eval splitJvmOpts $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS
-JVM_OPTS[${#JVM_OPTS[*]}]="-Dorg.gradle.appname=$APP_BASE_NAME"
+CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
-exec "$JAVACMD" \
-    "${JVM_OPTS[@]}" \
-    -classpath "$CLASSPATH" \
-    org.gradle.wrapper.GradleWrapperMain \
-    "$@"
+# Collect all arguments for the java command
+eval set -- $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "\"-Dorg.gradle.appname=$APP_BASE_NAME\"" -classpath "\"$CLASSPATH\"" org.gradle.wrapper.GradleWrapperMain "$@"
+
+exec "$JAVACMD" "$@"
