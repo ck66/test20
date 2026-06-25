@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.ScreenSearchOutlined
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -215,7 +214,7 @@ fun TextSearchScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.ScreenSearchOutlined,
+                                        imageVector = Icons.Default.Search,
                                         contentDescription = null,
                                         modifier = Modifier.size(40.dp),
                                         tint = MaterialTheme.colorScheme.onPrimaryContainer
