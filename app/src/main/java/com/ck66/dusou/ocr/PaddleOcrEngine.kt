@@ -7,34 +7,57 @@ import com.paddle.ocr.EngineConfig
 import com.paddle.ocr.PaddleOCR
 import com.paddle.ocr.PaddleOCRConfig
 import com.paddle.ocr.util.OpenCVUtils
-import kotlinx.coroutines.runBlocking
-import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 class PaddleOcrEngine(context: Context) : OcrEngine {
 
-    private val ocr: PaddleOCR by lazy {
-        OpenCVUtils.init(context)
-        runBlocking {
-            PaddleOCR.create(
-                context = context,
-                config = PaddleOCRConfig(
-                    detThresh = 0.3f,
-                    detBoxThresh = 0.6f,
-                ),
-                engineConfig = EngineConfig(),
-                detModelAssetPath = "models/det/inference.onnx",
-                recModelAssetPath = "models/rec/inference.onnx",
-                recConfigAssetPath = "models/rec/inference.yml",
-            )
-        }
+    @Volatile
+    private var ocr: PaddleOCR? = null
+    @Volatile
+    private var initError: Throwable? = null
+    private val initLock = Any()
+    private val appContext = context.applicationContext
+
+    init {
+        // 在后台线程中初始化 PaddleOCR，避免主线程阻塞
+        Thread({
+            try {
+                OpenCVUtils.init(appContext)
+                // PaddleOCR.create 是 suspend 函数，但我们在非 Android 主线程中
+                // 使用 runBlocking 是安全的，因为这是在后台工作线程中
+                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                    val engine = PaddleOCR.create(
+                        context = appContext,
+                        config = PaddleOCRConfig(
+                            detThresh = 0.3f,
+                            detBoxThresh = 0.6f,
+                        ),
+                        engineConfig = EngineConfig(),
+                        detModelAssetPath = "models/det/inference.onnx",
+                        recModelAssetPath = "models/rec/inference.onnx",
+                        recConfigAssetPath = "models/rec/inference.yml",
+                    )
+                    synchronized(initLock) {
+                        ocr = engine
+                    }
+                }
+            } catch (e: Throwable) {
+                synchronized(initLock) {
+                    initError = e
+                }
+            }
+        }, "PaddleOCR-Init").start()
     }
 
     override suspend fun recognize(bitmap: Bitmap): OcrResult {
-        val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-        val imageBytes = stream.toByteArray()
+        val engine = waitForInit()
 
-        val result = ocr.recognize(imageBytes)
+        // 直接使用 Bitmap 进行识别，避免 JPEG 压缩/解压的质量损失和延迟
+        val result = withContext(Dispatchers.IO) {
+            engine.recognize(bitmap)
+        }
 
         return OcrResult(
             text = result.results.joinToString("\n") { it.text },
@@ -60,7 +83,23 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
         )
     }
 
+    /**
+     * 轮询等待 OCR 引擎初始化完成（非阻塞，使用协程 delay）
+     */
+    private suspend fun waitForInit(): PaddleOCR {
+        while (true) {
+            synchronized(initLock) {
+                ocr?.let { return it }
+                initError?.let { throw IllegalStateException("OCR 引擎初始化失败", it) }
+            }
+            delay(100)
+        }
+    }
+
     override suspend fun release() {
-        ocr.release()
+        synchronized(initLock) {
+            ocr?.release()
+        }
+        ocr = null
     }
 }

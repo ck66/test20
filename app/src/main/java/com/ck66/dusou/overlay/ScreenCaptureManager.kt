@@ -11,8 +11,6 @@ import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.os.Handler
-import android.os.Looper
 import android.util.DisplayMetrics
 import android.view.Surface
 import java.nio.ByteBuffer
@@ -29,7 +27,12 @@ class ScreenCaptureManager private constructor() {
     private var screenWidth = 0
     private var screenHeight = 0
     private var screenDensity = 0
+
+    /** 必须使用 @Volatile，因为 ImageReader 回调在后台线程写入，captureScreen 可能在主线程读取 */
+    @Volatile
     private var latestBitmap: Bitmap? = null
+
+    @Volatile
     private var isCapturing = false
 
     fun startCapture(activity: Activity, resultCode: Int, data: Intent) {
@@ -39,20 +42,33 @@ class ScreenCaptureManager private constructor() {
         screenHeight = displayMetrics.heightPixels
         screenDensity = displayMetrics.densityDpi
 
+        // 验证屏幕尺寸有效性
+        if (screenWidth <= 0 || screenHeight <= 0) {
+            throw IllegalStateException("屏幕尺寸无效: ${screenWidth}x${screenHeight}")
+        }
+
         val manager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = manager.getMediaProjection(resultCode, data)
 
         imageReader = ImageReader.newInstance(
             screenWidth, screenHeight,
-            PixelFormat.RGBA_8888, 2
+            PixelFormat.RGBA_8888,
+            2 // maxImages: 使用双缓冲减少内存占用
         ).apply {
+            // 使用 null handler 让 ImageReader 在自有后台线程回调，避免主线程阻塞
             setOnImageAvailableListener({ reader ->
-                val image = reader.acquireLatestImage()
-                image?.let {
-                    latestBitmap = imageToBitmap(it)
-                    it.close()
+                var image: Image? = null
+                try {
+                    image = reader.acquireLatestImage()
+                    if (image != null) {
+                        latestBitmap = imageToBitmap(image)
+                    }
+                } catch (_: Exception) {
+                    // 忽略单帧异常，不中断屏幕捕获
+                } finally {
+                    image?.close()
                 }
-            }, Handler(Looper.getMainLooper()))
+            }, null)
         }
 
         imageReader?.let { reader ->

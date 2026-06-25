@@ -27,6 +27,11 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        /** 标记 FTS5 全文搜索是否可用（部分设备可能不支持 FTS5 扩展） */
+        @Volatile
+        var isFtsAvailable = false
+            private set
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -37,14 +42,20 @@ abstract class AppDatabase : RoomDatabase() {
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
-                            db.execSQL("""
-                                CREATE VIRTUAL TABLE IF NOT EXISTS questions_fts USING fts5(
-                                    stem, options, answer, analysis,
-                                    content='questions',
-                                    content_rowid='id',
-                                    tokenize='unicode61'
-                                )
-                            """.trimIndent())
+                            try {
+                                db.execSQL("""
+                                    CREATE VIRTUAL TABLE IF NOT EXISTS questions_fts USING fts5(
+                                        stem, options, answer, analysis,
+                                        content='questions',
+                                        content_rowid='id',
+                                        tokenize='unicode61'
+                                    )
+                                """.trimIndent())
+                                isFtsAvailable = true
+                            } catch (_: Exception) {
+                                // 设备不支持 FTS5，降级为 LIKE 搜索，不影响应用使用
+                                isFtsAvailable = false
+                            }
                         }
 
                         override fun onOpen(db: SupportSQLiteDatabase) {

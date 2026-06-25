@@ -6,6 +6,8 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -117,6 +119,7 @@ class ScreenSearchActivity : ComponentActivity() {
     private fun onMediaProjectionGranted(resultCode: Int, data: Intent) {
         captureManager.startCapture(this, resultCode, data)
 
+        // 先启动 ScreenCaptureService 前台服务以持有 MediaProjection 生命周期
         val serviceIntent = Intent(this, ScreenCaptureService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
@@ -124,12 +127,19 @@ class ScreenSearchActivity : ComponentActivity() {
             startService(serviceIntent)
         }
 
+        // 设置悬浮球回调并启动悬浮球服务
         FloatingBallManager.onBallClicked = {
             performScreenSearch()
         }
         FloatingBallManager.show(this)
 
-        finish()
+        // 延迟 finish() 以确保前台服务的 startForeground() 已执行完毕，
+        // 防止 Activity 过早销毁导致 MediaProjection 被系统回收
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                finish()
+            }
+        }, 300)
     }
 
     private fun performScreenSearch() {

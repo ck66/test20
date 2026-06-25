@@ -60,9 +60,11 @@ class QuestionRepository(private val database: AppDatabase) {
                 val questionsWithBankId = questions.map { it.copy(bankId = id) }
                 questionDao.insertAll(questionsWithBankId)
 
-                database.openHelper.writableDatabase.execSQL(
-                    "INSERT INTO questions_fts(questions_fts) VALUES('rebuild')"
-                )
+                if (AppDatabase.isFtsAvailable) {
+                    database.openHelper.writableDatabase.execSQL(
+                        "INSERT INTO questions_fts(questions_fts) VALUES('rebuild')"
+                    )
+                }
 
                 id
             }
@@ -86,9 +88,11 @@ class QuestionRepository(private val database: AppDatabase) {
                 questionBankDao.delete(bank)
             }
 
-            database.openHelper.writableDatabase.execSQL(
-                "INSERT INTO questions_fts(questions_fts) VALUES('rebuild')"
-            )
+            if (AppDatabase.isFtsAvailable) {
+                database.openHelper.writableDatabase.execSQL(
+                    "INSERT INTO questions_fts(questions_fts) VALUES('rebuild')"
+                )
+            }
         }
     }
 
@@ -98,6 +102,14 @@ class QuestionRepository(private val database: AppDatabase) {
 
     suspend fun searchQuestions(query: String): List<Question> {
         if (query.isBlank()) return emptyList()
+
+        if (!AppDatabase.isFtsAvailable) {
+            // FTS5 不可用，降级为 LIKE 搜索
+            return questionDao.searchByFts(SimpleSQLiteQuery(
+                "SELECT * FROM questions WHERE stem LIKE ? OR options LIKE ? OR answer LIKE ?",
+                arrayOf("%$query%", "%$query%", "%$query%")
+            ))
+        }
 
         val ftsQuery = query.trim().split("\\s+".toRegex())
             .filter { it.isNotBlank() }
