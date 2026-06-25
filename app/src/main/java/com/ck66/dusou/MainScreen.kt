@@ -59,6 +59,7 @@ import com.ck66.dusou.ui.practice.PracticeMode
 import com.ck66.dusou.ui.practice.PracticeModeDialog
 import com.ck66.dusou.ui.practice.PracticeScreen
 import com.ck66.dusou.ui.practice.WrongQuestionScreen
+import com.ck66.dusou.ui.profile.ProfileScreen
 import com.ck66.dusou.ui.search.PhotoSearchScreen
 import com.ck66.dusou.ui.search.SearchUiState
 import com.ck66.dusou.ui.search.SearchViewModel
@@ -179,7 +180,13 @@ fun MainScreen() {
                         },
                         modifier = Modifier.padding(innerPadding)
                     )
-                    2 -> ProfileScreen(modifier = Modifier.padding(innerPadding))
+                    2 -> {
+                        val profileRepository = remember { QuestionRepositoryProvider.get() }
+                        ProfileScreen(
+                            repository = profileRepository,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
         }
@@ -514,9 +521,4 @@ fun QuestionBankScreen(
         onWrongBook = onWrongBook,
         modifier = modifier
     )
-}
-
-@Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
-    // TODO: 我的页面（设置 + 关于）
 }
