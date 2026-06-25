@@ -55,7 +55,6 @@ coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-androi
 
 # Text Utils
 commons-text = { module = "org.apache.commons:commons-text", version.ref = "commons-text" }
-wcdb = { module = "com.tencent.wcdb:wcdb-android", version.ref = "wcdb" }
 
 # Testing
 junit = { module = "junit:junit", version.ref = "junit" }

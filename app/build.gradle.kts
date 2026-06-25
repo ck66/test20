@@ -76,11 +76,10 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
 
-    // Room + WCDB
+    // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
-    implementation(libs.wcdb)
 
     // DataStore
     implementation(libs.datastore.preferences)

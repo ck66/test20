@@ -11,7 +11,10 @@ import com.ck66.dusou.database.dao.QuestionDao
 import com.ck66.dusou.database.entity.PracticeRecord
 import com.ck66.dusou.database.entity.Question
 import com.ck66.dusou.database.entity.QuestionBank
-import com.tencent.wcdb.room.WCDBOpenHelperFactory
+import androidx.room.RoomDatabase
+import androidx.room.Room
+import androidx.room.Database
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [QuestionBank::class, Question::class, PracticeRecord::class],
@@ -35,7 +38,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dusou.db"
                 )
-                    .openHelperFactory(WCDBOpenHelperFactory())
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
