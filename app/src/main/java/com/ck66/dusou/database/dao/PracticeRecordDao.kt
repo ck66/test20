@@ -17,6 +17,9 @@ interface PracticeRecordDao {
     @Query("SELECT * FROM practice_records WHERE bankId = :bankId ORDER BY practiceTime DESC")
     fun getAllByBankId(bankId: Long): Flow<List<PracticeRecord>>
 
+    @Query("SELECT * FROM practice_records WHERE bankId = :bankId ORDER BY practiceTime DESC")
+    suspend fun getAllByBankIdList(bankId: Long): List<PracticeRecord>
+
     @Query("""
         SELECT
             COALESCE((SELECT COUNT(DISTINCT q.id) FROM questions q WHERE q.bankId = :bankId), 0) AS totalQuestions,

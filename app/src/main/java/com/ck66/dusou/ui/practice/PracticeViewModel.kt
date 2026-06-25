@@ -21,9 +21,9 @@ sealed interface PracticeUiState {
         val currentIndex: Int,
         val correctCount: Int,
         val wrongCount: Int,
-        val isFinished: Boolean,
         val showAnswer: Boolean,
         val selectedAnswer: String?,
+        val isCorrect: Boolean?,
         val stats: PracticeStats?
     ) : PracticeUiState
     data class Finished(
@@ -32,6 +32,7 @@ sealed interface PracticeUiState {
         val totalCount: Int,
         val accuracy: Float
     ) : PracticeUiState
+    data object Empty : PracticeUiState
     data class Error(val message: String) : PracticeUiState
 }
 
@@ -75,7 +76,7 @@ class PracticeViewModel(
                 wrongCount = 0
 
                 if (questions.isEmpty()) {
-                    _uiState.value = PracticeUiState.Error("没有找到题目")
+                    _uiState.value = PracticeUiState.Empty
                 } else {
                     emitActiveState()
                 }
@@ -110,7 +111,7 @@ class PracticeViewModel(
                 if (currentIndex + 1 >= questions.size) {
                     emitFinishedState()
                 } else {
-                    emitActiveState(showAnswer = true, selectedAnswer = userAnswer)
+                    emitActiveState(showAnswer = true, selectedAnswer = userAnswer, isCorrect = isCorrect)
                 }
             } catch (e: Exception) {
                 _uiState.value = PracticeUiState.Error("提交答案失败: ${e.message}")
@@ -133,9 +134,8 @@ class PracticeViewModel(
     }
 
     fun restart(bankId: Long, mode: PracticeMode, favoriteIds: List<Long> = emptyList()) {
-        currentMode = mode
-        currentFavoriteIds = favoriteIds
-        loadQuestions(bankId, mode, favoriteIds)
+        val favs = if (favoriteIds.isNotEmpty()) favoriteIds else currentFavoriteIds
+        loadQuestions(bankId, mode, favs)
     }
 
     fun loadStats(bankId: Long) {
@@ -155,16 +155,16 @@ class PracticeViewModel(
     private fun emitActiveState(
         showAnswer: Boolean = false,
         selectedAnswer: String? = null,
-        isFinished: Boolean = false
+        isCorrect: Boolean? = null
     ) {
         _uiState.value = PracticeUiState.Active(
             questions = questions,
             currentIndex = currentIndex,
             correctCount = correctCount,
             wrongCount = wrongCount,
-            isFinished = isFinished,
             showAnswer = showAnswer,
             selectedAnswer = selectedAnswer,
+            isCorrect = isCorrect,
             stats = null
         )
     }

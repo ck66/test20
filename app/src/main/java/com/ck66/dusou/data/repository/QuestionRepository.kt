@@ -129,4 +129,22 @@ class QuestionRepository(private val database: AppDatabase) {
     suspend fun getPracticeStats(bankId: Long): PracticeStats {
         return practiceRecordDao.getStats(bankId)
     }
+
+    suspend fun getWrongQuestionsWithInfo(bankId: Long): List<com.ck66.dusou.database.model.WrongQuestionInfo> {
+        val questions = getWrongQuestions(bankId).let { flow ->
+            kotlinx.coroutines.flow.first(flow)
+        }
+        val records = practiceRecordDao.getAllByBankIdList(bankId)
+
+        return questions.map { question ->
+            val latestWrongRecord = records
+                .filter { it.questionId == question.id && !it.isCorrect }
+                .maxByOrNull { it.practiceTime }
+            com.ck66.dusou.database.model.WrongQuestionInfo(
+                question = question,
+                userAnswer = latestWrongRecord?.userAnswer ?: "",
+                practiceTime = latestWrongRecord?.practiceTime ?: 0
+            )
+        }
+    }
 }

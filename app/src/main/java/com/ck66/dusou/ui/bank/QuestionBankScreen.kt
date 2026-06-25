@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -59,7 +60,8 @@ fun QuestionBankContent(
     onSearch: (String) -> Unit,
     onClearSearch: () -> Unit,
     onDismissImport: () -> Unit,
-    onStartPractice: (Long) -> Unit,
+    onStartPractice: (Long, QuestionBank) -> Unit,
+    onWrongBook: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 本地 UI 状态：搜索模式、搜索词、待删除题库
@@ -103,6 +105,7 @@ fun QuestionBankContent(
                     BankListContent(
                         banks = state.banks,
                         onStartPractice = onStartPractice,
+                        onWrongBook = onWrongBook,
                         onSearchClick = { isSearchActive = true },
                         onDeleteBank = { bankToDelete = it },
                         onImportClick = onImportClick
@@ -268,7 +271,8 @@ private fun SearchContent(
 @Composable
 private fun BankListContent(
     banks: List<QuestionBank>,
-    onStartPractice: (Long) -> Unit,
+    onStartPractice: (Long, QuestionBank) -> Unit,
+    onWrongBook: (Long) -> Unit,
     onSearchClick: () -> Unit,
     onDeleteBank: (QuestionBank) -> Unit,
     onImportClick: () -> Unit,
@@ -287,7 +291,8 @@ private fun BankListContent(
             items(banks, key = { it.id }) { bank ->
                 BankCard(
                     bank = bank,
-                    onPractice = { onStartPractice(bank.id) },
+                    onPractice = { onStartPractice(bank.id, bank) },
+                    onWrongBook = { onWrongBook(bank.id) },
                     onSearch = onSearchClick,
                     onDelete = { onDeleteBank(bank) }
                 )
@@ -341,6 +346,7 @@ private fun EmptyState(
 fun BankCard(
     bank: QuestionBank,
     onPractice: () -> Unit,
+    onWrongBook: () -> Unit,
     onSearch: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -391,6 +397,13 @@ fun BankCard(
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = "练习",
                     tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            IconButton(onClick = onWrongBook) {
+                Icon(
+                    imageVector = Icons.Default.ErrorOutline,
+                    contentDescription = "错题本",
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
             IconButton(onClick = onSearch) {

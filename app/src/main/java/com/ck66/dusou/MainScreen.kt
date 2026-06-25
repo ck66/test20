@@ -55,6 +55,10 @@ import com.ck66.dusou.matcher.TextMatcher
 import com.ck66.dusou.ocr.OcrEngineProvider
 import com.ck66.dusou.ui.bank.BankViewModel
 import com.ck66.dusou.ui.bank.QuestionBankContent
+import com.ck66.dusou.ui.practice.PracticeMode
+import com.ck66.dusou.ui.practice.PracticeModeDialog
+import com.ck66.dusou.ui.practice.PracticeScreen
+import com.ck66.dusou.ui.practice.WrongQuestionScreen
 import com.ck66.dusou.ui.search.PhotoSearchScreen
 import com.ck66.dusou.ui.search.SearchUiState
 import com.ck66.dusou.ui.search.SearchViewModel
@@ -63,6 +67,11 @@ private data class BottomNavItem(
     val label: String,
     val icon: ImageVector,
 )
+
+private sealed class Screen {
+    data class Practice(val bankId: Long, val bankName: String, val mode: PracticeMode) : Screen()
+    data class WrongBook(val bankId: Long) : Screen()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,19 +86,25 @@ fun MainScreen() {
     // Search tab state
     var showCamera by remember { mutableStateOf(false) }
 
+    // Practice navigation state
+    var currentScreen by remember { mutableStateOf<Screen?>(null) }
+    var practiceModeTarget by remember { mutableStateOf<com.ck66.dusou.database.entity.QuestionBank?>(null) }
+
     Scaffold(
         topBar = {
             if (!showCamera || selectedIndex != 0) {
-                TopAppBar(
-                    title = { Text("读屏搜题") },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                if (currentScreen == null) {
+                    TopAppBar(
+                        title = { Text("读屏搜题") },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
                     )
-                )
+                }
             }
         },
         bottomBar = {
-            if (!showCamera || selectedIndex != 0) {
+            if ((!showCamera || selectedIndex != 0) && currentScreen == null) {
                 NavigationBar {
                     navItems.forEachIndexed { index, item ->
                         NavigationBarItem(
@@ -103,28 +118,86 @@ fun MainScreen() {
             }
         }
     ) { innerPadding ->
-        when (selectedIndex) {
-            0 -> {
-                if (showCamera) {
-                    val ocrEngine = remember { OcrEngineProvider.get() }
-                    val textMatcher = remember { TextMatcher() }
-                    val searchViewModel = remember {
-                        SearchViewModel(ocrEngine, textMatcher)
+        // Check for practice/wrong book navigation
+        when (val screen = currentScreen) {
+            is Screen.Practice -> {
+                val repository = remember { QuestionRepositoryProvider.get() }
+                PracticeScreen(
+                    bankId = screen.bankId,
+                    bankName = screen.bankName,
+                    mode = screen.mode,
+                    repository = repository,
+                    onNavigateBack = { currentScreen = null },
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+
+            is Screen.WrongBook -> {
+                val repository = remember { QuestionRepositoryProvider.get() }
+                WrongQuestionScreen(
+                    bankId = screen.bankId,
+                    repository = repository,
+                    onStartRetry = {
+                        currentScreen = Screen.Practice(
+                            bankId = screen.bankId,
+                            bankName = "错题重练",
+                            mode = PracticeMode.WRONG
+                        )
+                    },
+                    onNavigateBack = { currentScreen = null },
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+
+            null -> {
+                when (selectedIndex) {
+                    0 -> {
+                        if (showCamera) {
+                            val ocrEngine = remember { OcrEngineProvider.get() }
+                            val textMatcher = remember { TextMatcher() }
+                            val searchViewModel = remember {
+                                SearchViewModel(ocrEngine, textMatcher)
+                            }
+                            PhotoSearchScreen(
+                                viewModel = searchViewModel,
+                                onNavigateBack = { showCamera = false },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        } else {
+                            TextSearchScreen(
+                                onOpenCamera = { showCamera = true },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
                     }
-                    PhotoSearchScreen(
-                        viewModel = searchViewModel,
-                        onNavigateBack = { showCamera = false },
+                    1 -> QuestionBankScreen(
+                        onStartPractice = { bankId, bank ->
+                            practiceModeTarget = bank
+                        },
+                        onWrongBook = { bankId ->
+                            currentScreen = Screen.WrongBook(bankId)
+                        },
                         modifier = Modifier.padding(innerPadding)
                     )
-                } else {
-                    TextSearchScreen(
-                        onOpenCamera = { showCamera = true },
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    2 -> ProfileScreen(modifier = Modifier.padding(innerPadding))
                 }
             }
-            1 -> QuestionBankScreen(modifier = Modifier.padding(innerPadding))
-            2 -> ProfileScreen(modifier = Modifier.padding(innerPadding))
+        }
+
+        // Practice mode dialog
+        practiceModeTarget?.let { bank ->
+            PracticeModeDialog(
+                bank = bank,
+                onDismiss = { practiceModeTarget = null },
+                onStartPractice = { bankId, mode ->
+                    currentScreen = Screen.Practice(
+                        bankId = bankId,
+                        bankName = bank.name,
+                        mode = mode
+                    )
+                    practiceModeTarget = null
+                }
+            )
         }
     }
 }
@@ -411,7 +484,11 @@ fun TextSearchScreen(
 }
 
 @Composable
-fun QuestionBankScreen(modifier: Modifier = Modifier) {
+fun QuestionBankScreen(
+    onStartPractice: (Long, com.ck66.dusou.database.entity.QuestionBank) -> Unit,
+    onWrongBook: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val repository = remember { QuestionRepositoryProvider.get() }
     val viewModel = remember { BankViewModel(repository) }
@@ -433,7 +510,8 @@ fun QuestionBankScreen(modifier: Modifier = Modifier) {
         onSearch = { viewModel.searchQuestions(it) },
         onClearSearch = { viewModel.clearSearch() },
         onDismissImport = { viewModel.dismissImportState() },
-        onStartPractice = { bankId -> /* TODO: 导航到练习页面 */ },
+        onStartPractice = onStartPractice,
+        onWrongBook = onWrongBook,
         modifier = modifier
     )
 }
