@@ -13,7 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import com.ck66.dusou.repository.QuestionRepositoryProvider
+import com.ck66.dusou.data.repository.QuestionRepositoryProvider
 import com.ck66.dusou.ui.bank.BankViewModel
 import com.ck66.dusou.ui.bank.QuestionBankContent
 
@@ -77,18 +77,19 @@ fun QuestionBankScreen(modifier: Modifier = Modifier) {
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { viewModel.importBank(context, it) }
+        uri?.let {
+            val bankName = it.lastPathSegment ?: "未命名题库"
+            viewModel.importBank(context, it, bankName)
+        }
     }
 
     QuestionBankContent(
         uiState = uiState,
         onImportClick = { filePickerLauncher.launch(arrayOf("*/*")) },
         onDeleteBank = { viewModel.deleteBank(it) },
-        onConfirmDelete = { viewModel.confirmDeleteBank(it) },
-        onDismissDelete = { viewModel.dismissDeleteDialog() },
         onSearch = { viewModel.searchQuestions(it) },
         onClearSearch = { viewModel.clearSearch() },
-        onDismissImport = { viewModel.dismissImport() },
+        onDismissImport = { viewModel.dismissImportState() },
         onStartPractice = { bankId -> /* TODO: 导航到练习页面 */ },
         modifier = modifier
     )

@@ -2,6 +2,7 @@ package com.ck66.dusou.data.repository
 
 import android.content.Context
 import android.net.Uri
+import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.ck66.dusou.database.AppDatabase
 import com.ck66.dusou.database.dao.PracticeRecordDao
@@ -53,7 +54,7 @@ class QuestionRepository(private val database: AppDatabase) {
                 importTime = System.currentTimeMillis()
             )
 
-            val bankId = database.runInTransaction {
+            val bankId = database.withTransaction {
                 val id = questionBankDao.insert(bank)
                 val questionsWithBankId = questions.map { it.copy(bankId = id) }
                 questionDao.insertAll(questionsWithBankId)
@@ -76,7 +77,7 @@ class QuestionRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteBank(bankId: Long) {
-        database.runInTransaction {
+        database.withTransaction {
             practiceRecordDao.deleteByBankId(bankId)
             questionDao.deleteByBankId(bankId)
             val bank = questionBankDao.getById(bankId)
