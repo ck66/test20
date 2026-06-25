@@ -6,6 +6,7 @@
 
     <!-- 相机权限（拍照搜题） -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- 存储权限（导入题库） -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
