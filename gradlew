@@ -23,7 +23,7 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
 
 MAX_FD="maximum"
 
@@ -47,17 +47,54 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
-JAVA_EXE=java
+JAVACMD="java"
 if [ -n "$JAVA_HOME" ] ; then
-    JAVA_EXE="$JAVA_HOME/bin/java"
+    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+        JAVACMD="$JAVA_HOME/jre/sh/java"
+    else
+        JAVACMD="$JAVA_HOME/bin/java"
+    fi
+fi
+if [ ! -x "$JAVACMD" ] ; then
+    die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+
+Please set the JAVA_HOME variable in your environment to match the
+location of your Java installation."
 fi
 
 if [ -n "$IS_WINDOWS" ] ; then
-    # Use java.exe instead
-    JAVA_EXE="java"
+    JAVACMD="java"
 fi
 
-exec "$JAVA_EXE" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \
+# Increase the maximum file descriptors if we can.
+if [ "$MAX_FD" = "maximum" -a "$OS_NAME" != "CYGWIN" -a "$OS_NAME" != "MSYS" ] ; then
+    MAX_FD_LIMIT=`ulimit -H -n`
+    if [ $? -eq 0 ] ; then
+        if [ "$MAX_FD" = "maximum" -o "$MAX_FD" = "max" ] ; then
+            MAX_FD="$MAX_FD_LIMIT"
+        fi
+        ulimit -n $MAX_FD
+        if [ $? -ne 0 ] ; then
+            warn "Could not set maximum file descriptor limit: $MAX_FD"
+        fi
+    else
+        warn "Could not query maximum file descriptor limit: $MAX_FD_LIMIT"
+    fi
+fi
+
+# Split up the JVM_OPTS And GRADLE_OPTS values into an array
+eval splitJvmOpts() {
+    JVM_OPTS=()
+    while [ $# -gt 0 ] ; do
+        JVM_OPTS="$JVM_OPTS $1"
+        shift
+    done
+}
+eval splitJvmOpts $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS
+JVM_OPTS[${#JVM_OPTS[*]}]="-Dorg.gradle.appname=$APP_BASE_NAME"
+
+exec "$JAVACMD" \
+    "${JVM_OPTS[@]}" \
     -classpath "$CLASSPATH" \
     org.gradle.wrapper.GradleWrapperMain \
     "$@"
