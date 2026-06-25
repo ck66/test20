@@ -1,0 +1,684 @@
+package com.ck66.dusou.ui.search
+
+import android.content.ContentValues
+import android.graphics.Bitmap
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.ck66.dusou.matcher.MatchResult
+import java.io.OutputStream
+import java.util.concurrent.Executors
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PhotoSearchScreen(
+    viewModel: SearchViewModel,
+    onNavigateBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val capturedBitmap by viewModel.capturedBitmap.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("拍照搜题") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+        },
+        modifier = modifier
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when (uiState) {
+                is SearchUiState.Idle,
+                is SearchUiState.Recognizing,
+                is SearchUiState.Matching -> {
+                    CameraPreviewContent(
+                        capturedBitmap = capturedBitmap,
+                        isProcessing = uiState !is SearchUiState.Idle,
+                        currentState = uiState,
+                        onCapture = { bitmap -> viewModel.searchFromBitmap(bitmap) },
+                        onRetake = { viewModel.clearCapturedBitmap() },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                is SearchUiState.Result -> {
+                    ResultContent(
+                        match = (uiState as SearchUiState.Result).match,
+                        onNewSearch = { viewModel.clearResult() },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                is SearchUiState.NotFound -> {
+                    NotFoundContent(
+                        ocrText = (uiState as SearchUiState.NotFound).ocrText,
+                        onRetake = { viewModel.clearCapturedBitmap(); viewModel.clearResult() },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                is SearchUiState.Error -> {
+                    ErrorContent(
+                        message = (uiState as SearchUiState.Error).message,
+                        onRetry = {
+                            viewModel.clearResult()
+                            capturedBitmap?.let { viewModel.searchFromBitmap(it) }
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraPreviewContent(
+    capturedBitmap: Bitmap?,
+    isProcessing: Boolean,
+    currentState: SearchUiState,
+    onCapture: (Bitmap) -> Unit,
+    onRetake: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        if (capturedBitmap != null) {
+            // Show captured photo preview
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    androidx.compose.foundation.Image(
+                        bitmap = capturedBitmap.asImageBitmap(),
+                        contentDescription = "拍摄的照片",
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // Guide lines overlay on preview
+                    GuideLinesOverlay()
+                }
+
+                // Bottom actions
+                BottomActionBar(
+                    isProcessing = isProcessing,
+                    currentState = currentState,
+                    onCapture = { onCapture(capturedBitmap) },
+                    onRetake = onRetake
+                )
+            }
+        } else {
+            // Show live camera preview
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                AndroidView(
+                    factory = { ctx ->
+                        val view = PreviewView(ctx).also { previewView = it }
+                        val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+
+                        val executor = Executors.newSingleThreadExecutor()
+                        cameraProviderFuture.addListener({
+                            val cameraProvider = cameraProviderFuture.get()
+
+                            val preview = Preview.Builder().build().also {
+                                it.setSurfaceProvider(view.surfaceProvider)
+                            }
+
+                            val capture = ImageCapture.Builder()
+                                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                .build()
+                                .also { imageCapture = it }
+
+                            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                            try {
+                                cameraProvider.unbindAll()
+                                cameraProvider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    cameraSelector,
+                                    preview,
+                                    capture
+                                )
+                            } catch (_: Exception) {
+                                // Camera binding may fail; handled by the error UI
+                            }
+                        }, ContextCompat.getMainExecutor(ctx))
+
+                        view
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Guide lines overlay
+                GuideLinesOverlay()
+
+                // Center crosshair
+                CameraCrosshair()
+            }
+
+            // Capture button at bottom center
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 24.dp)
+            ) {
+                CaptureButton(
+                    enabled = !isProcessing && imageCapture != null,
+                    onClick = {
+                        val capture = imageCapture ?: return@CaptureButton
+                        val contentValues = ContentValues().apply {
+                            put(MediaStore.Images.Media.DISPLAY_NAME, "dusou_${System.currentTimeMillis()}.jpg")
+                            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                            }
+                        }
+
+                        val outputOptions = ImageCapture.OutputFileOptions.Builder(
+                            context.contentResolver,
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                            contentValues
+                        ).build()
+
+                        capture.takePicture(
+                            outputOptions,
+                            Executors.newSingleThreadExecutor(),
+                            object : ImageCapture.OnImageSavedCallback {
+                                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                    // Load bitmap from saved URI
+                                    try {
+                                        val uri = output.savedUri ?: return
+                                        val bitmap = android.provider.MediaStore.Images.Media
+                                            .getBitmap(context.contentResolver, uri)
+                                        onCapture(bitmap)
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "拍照失败", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+
+                                override fun onError(exc: ImageCaptureException) {
+                                    Toast.makeText(context, "拍照失败: ${exc.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuideLinesOverlay() {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val lineColor = Color.White.copy(alpha = 0.3f)
+        val strokeWidth = 1.dp.toPx()
+
+        // Horizontal guidelines (rule of thirds)
+        val hStep = size.height / 3
+        drawLine(
+            color = lineColor,
+            start = Offset(0f, hStep),
+            end = Offset(size.width, hStep),
+            strokeWidth = strokeWidth
+        )
+        drawLine(
+            color = lineColor,
+            start = Offset(0f, hStep * 2),
+            end = Offset(size.width, hStep * 2),
+            strokeWidth = strokeWidth
+        )
+
+        // Vertical guidelines (rule of thirds)
+        val vStep = size.width / 3
+        drawLine(
+            color = lineColor,
+            start = Offset(vStep, 0f),
+            end = Offset(vStep, size.height),
+            strokeWidth = strokeWidth
+        )
+        drawLine(
+            color = lineColor,
+            start = Offset(vStep * 2, 0f),
+            end = Offset(vStep * 2, size.height),
+            strokeWidth = strokeWidth
+        )
+    }
+}
+
+@Composable
+private fun CameraCrosshair() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(48.dp)) {
+            val center = Offset(size.width / 2, size.height / 2)
+            val armLength = size.width / 2
+            val color = Color.White.copy(alpha = 0.5f)
+            val strokeWidth = 2.dp.toPx()
+
+            // Horizontal line
+            drawLine(color, Offset(center.x - armLength, center.y), Offset(center.x + armLength, center.y), strokeWidth)
+            // Vertical line
+            drawLine(color, Offset(center.x, center.y - armLength), Offset(center.x, center.y + armLength), strokeWidth)
+            // Circle
+            drawCircle(color, radius = size.width / 4, center = center, style = Stroke(strokeWidth))
+        }
+    }
+}
+
+@Composable
+private fun CaptureButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(72.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f))
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Camera,
+            contentDescription = "拍照",
+            tint = Color.White,
+            modifier = Modifier.size(36.dp)
+        )
+    }
+}
+
+@Composable
+private fun BottomActionBar(
+    isProcessing: Boolean,
+    currentState: SearchUiState,
+    onCapture: () -> Unit,
+    onRetake: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (isProcessing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = when (currentState) {
+                    is SearchUiState.Recognizing -> "正在识别文字..."
+                    is SearchUiState.Matching -> "正在匹配题目..."
+                    else -> "处理中..."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Button(
+                    onClick = onRetake,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Text("重拍")
+                }
+
+                Button(
+                    onClick = onCapture,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("识别搜题")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultContent(
+    match: MatchResult,
+    onNewSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val question = match.question ?: return
+
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Similarity badge
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "匹配成功 · 相似度 ${"%.0f".format(match.similarity * 100)}%",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        // OCR text preview
+        if (match.ocrText.isNotBlank()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "识别文本",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = match.ocrText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        // Question stem
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "题目",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = question.stem,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
+
+        // Answer
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "答案",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = question.answer,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // Analysis (if available)
+        if (!question.analysis.isNullOrBlank()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "解析",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = question.analysis ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // New search button
+        Button(
+            onClick = onNewSearch,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.Camera,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("继续搜题")
+        }
+    }
+}
+
+@Composable
+private fun NotFoundContent(
+    ocrText: String,
+    onRetake: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Warning,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "未找到匹配题目",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (ocrText.isNotBlank()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "识别到的文字：",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = ocrText,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Start
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(
+            onClick = onRetake,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("重新拍照")
+        }
+    }
+}
+
+@Composable
+private fun ErrorContent(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Warning,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "出错了",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onRetry) {
+            Text("重试")
+        }
+    }
+}

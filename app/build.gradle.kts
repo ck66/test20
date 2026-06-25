@@ -91,6 +91,9 @@ dependencies {
     // Text Utils
     implementation(libs.commons.text)
 
+    // ML Kit (OCR)
+    implementation(libs.mlkit.text.recognition.chinese)
+
     // Debug
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

@@ -11,6 +11,7 @@ room = "2.7.0"
 datastore = "1.1.3"
 coroutines = "1.10.1"
 commons-text = "1.12.0"
+mlkit-text-recognition = "16.0.1"
 wcdb = "1.1-19"
 junit = "4.13.2"
 androidx-test-ext-junit = "1.2.1"
@@ -55,6 +56,9 @@ coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-androi
 
 # Text Utils
 commons-text = { module = "org.apache.commons:commons-text", version.ref = "commons-text" }
+
+# ML Kit
+mlkit-text-recognition-chinese = { module = "com.google.mlkit:text-recognition-chinese", version.ref = "mlkit-text-recognition" }
 
 # Testing
 junit = { module = "junit:junit", version.ref = "junit" }
