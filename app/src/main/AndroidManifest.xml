@@ -46,6 +46,18 @@
             android:foregroundServiceType="mediaProjection|specialUse"
             android:exported="false" />
 
+        <!-- 悬浮球前台服务 -->
+        <service
+            android:name=".overlay.FloatingBallService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false" />
+
+        <!-- 读屏搜题引导页 -->
+        <activity
+            android:name=".overlay.ScreenSearchActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true" />
+
     </application>
 
 </manifest>
