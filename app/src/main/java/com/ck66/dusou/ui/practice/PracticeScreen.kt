@@ -196,9 +196,6 @@ fun PracticeScreen(
                         totalCount = state.totalCount,
                         accuracy = state.accuracy,
                         onRestart = {
-                            val favorites = remember {
-                                scope.launch { FavoriteManager.getAllFavorites(context) }
-                            }
                             viewModel.restart(bankId, mode)
                         },
                         onExit = onNavigateBack

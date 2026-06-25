@@ -44,6 +44,16 @@ interface QuestionDao {
     @Query("SELECT * FROM questions WHERE bankId = :bankId AND id IN (:favoriteIds)")
     fun getFavoriteQuestions(bankId: Long, favoriteIds: List<Long>): Flow<List<Question>>
 
+    @Query("""
+        SELECT DISTINCT q.* FROM questions q
+        INNER JOIN practice_records pr ON q.id = pr.questionId AND q.bankId = pr.bankId
+        WHERE q.bankId = :bankId AND pr.isCorrect = 0
+    """)
+    suspend fun getWrongQuestionsList(bankId: Long): List<Question>
+
+    @Query("SELECT * FROM questions WHERE bankId = :bankId AND id IN (:favoriteIds)")
+    suspend fun getFavoriteQuestionsList(bankId: Long, favoriteIds: List<Long>): List<Question>
+
     @Query("DELETE FROM questions WHERE bankId = :bankId")
     suspend fun deleteByBankId(bankId: Long)
 

@@ -12,6 +12,7 @@ import com.ck66.dusou.database.entity.PracticeRecord
 import com.ck66.dusou.database.entity.Question
 import com.ck66.dusou.database.entity.QuestionBank
 import com.ck66.dusou.database.model.PracticeStats
+import com.ck66.dusou.database.model.WrongQuestionInfo
 import com.ck66.dusou.parser.QuizParserFactory
 import kotlinx.coroutines.flow.Flow
 
@@ -130,20 +131,16 @@ class QuestionRepository(private val database: AppDatabase) {
         return practiceRecordDao.getStats(bankId)
     }
 
-    suspend fun getWrongQuestionsWithInfo(bankId: Long): List<com.ck66.dusou.database.model.WrongQuestionInfo> {
-        val questions = getWrongQuestions(bankId).let { flow ->
-            kotlinx.coroutines.flow.first(flow)
-        }
+    suspend fun getWrongQuestionsWithInfo(bankId: Long): List<WrongQuestionInfo> {
+        val wrongQuestions = questionDao.getWrongQuestionsList(bankId)
         val records = practiceRecordDao.getAllByBankIdList(bankId)
-
-        return questions.map { question ->
-            val latestWrongRecord = records
-                .filter { it.questionId == question.id && !it.isCorrect }
-                .maxByOrNull { it.practiceTime }
-            com.ck66.dusou.database.model.WrongQuestionInfo(
-                question = question,
-                userAnswer = latestWrongRecord?.userAnswer ?: "",
-                practiceTime = latestWrongRecord?.practiceTime ?: 0
+        val recordMap = records.associateBy { it.questionId }
+        return wrongQuestions.map { q ->
+            val record = recordMap[q.id]
+            WrongQuestionInfo(
+                question = q,
+                userAnswer = record?.userAnswer ?: "",
+                practiceTime = record?.practiceTime ?: 0L
             )
         }
     }
