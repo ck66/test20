@@ -52,7 +52,7 @@ class MlKitOcrEngine(context: Context) : OcrEngine {
         }
     }
 
-    override fun release() {
+    override suspend fun release() {
         recognizer.close()
     }
 }

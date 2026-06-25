@@ -5,7 +5,7 @@ import android.graphics.Rect
 
 interface OcrEngine {
     suspend fun recognize(bitmap: Bitmap): OcrResult
-    fun release()
+    suspend fun release()
 }
 
 data class OcrResult(

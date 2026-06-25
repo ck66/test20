@@ -6,24 +6,25 @@ import android.graphics.Rect
 import com.paddle.ocr.PaddleOCR
 import com.paddle.ocr.PaddleOCRConfig
 import com.paddle.ocr.util.OpenCVUtils
+import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayOutputStream
 
 class PaddleOcrEngine(context: Context) : OcrEngine {
 
-    private val ocr: PaddleOCR
-
-    init {
+    private val ocr: PaddleOCR by lazy {
         OpenCVUtils.init(context)
-        ocr = PaddleOCR.create(
-            context = context,
-            config = PaddleOCRConfig(
-                detThresh = 0.3f,
-                detBoxThresh = 0.6f,
-            ),
-            detModelAssetPath = "models/det/inference.onnx",
-            recModelAssetPath = "models/rec/inference.onnx",
-            recConfigAssetPath = "models/rec/inference.yml",
-        )
+        runBlocking {
+            PaddleOCR.create(
+                context = context,
+                config = PaddleOCRConfig(
+                    detThresh = 0.3f,
+                    detBoxThresh = 0.6f,
+                ),
+                detModelAssetPath = "models/det/inference.onnx",
+                recModelAssetPath = "models/rec/inference.onnx",
+                recConfigAssetPath = "models/rec/inference.yml",
+            )
+        }
     }
 
     override suspend fun recognize(bitmap: Bitmap): OcrResult {
@@ -57,7 +58,7 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
         )
     }
 
-    override fun release() {
+    override suspend fun release() {
         ocr.release()
     }
 }
