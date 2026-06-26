@@ -163,7 +163,9 @@ class PracticeViewModel(
     private fun normalizeAnswer(answer: String, type: String): String {
         return when {
             type == "多选" || type == "多选题" -> {
-                answer.trim().toCharArray().sorted().joinToString("").uppercase()
+                answer.trim()
+                    .replace(Regex("[,，、\\s]"), "")  // 移除所有分隔符
+                    .toCharArray().sorted().joinToString("").uppercase()
             }
             type == "判断" || type == "判断题" -> {
                 when (answer.trim()) {
