@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ck66.dusou.database.dao.PracticeRecordDao
 import com.ck66.dusou.database.dao.QuestionBankDao
@@ -32,6 +33,13 @@ abstract class AppDatabase : RoomDatabase() {
         var isFtsAvailable = false
             private set
 
+        /**
+         * 数据库 Migration 策略：显式定义每次版本升级的 SQL，避免 fallbackToDestructiveMigration 导致数据丢失。
+         * 当前版本 1，无历史迁移；后续版本按需添加 MIGRATION_X_Y 条目。
+         */
+        @Suppress("unused")
+        private val MIGRATIONS = arrayOf<Migration>()
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -39,6 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dusou.db"
                 )
+                    .addMigrations(*MIGRATIONS)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

@@ -44,10 +44,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,12 +73,17 @@ fun PracticeScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val viewModel = remember(bankId, mode) { PracticeViewModel(repository, bankId) }
+    val viewModel: PracticeViewModel = viewModel(factory = PracticeViewModelFactory(repository, bankId))
     val uiState by viewModel.uiState.collectAsState()
     var showExitDialog by remember { mutableStateOf(false) }
 
+    // Reactive favorites: mutableStateMapOf triggers recomposition on change
+    val favoriteState = remember { mutableStateMapOf<Long, Boolean>() }
+
     LaunchedEffect(bankId, mode) {
         val favorites = FavoriteManager.getAllFavorites(context)
+        favoriteState.clear()
+        favorites.forEach { favoriteState[it] = true }
         viewModel.loadQuestions(bankId, mode, favorites)
     }
 
@@ -175,14 +182,15 @@ fun PracticeScreen(
                             showAnswer = state.showAnswer,
                             selectedAnswer = state.selectedAnswer,
                             isCorrect = state.isCorrect,
-                            isFavorite = rememberFavorite(question.id, context),
+                            isFavorite = favoriteState[question.id] ?: false,
                             onAnswer = { answer ->
                                 viewModel.submitAnswer(question.id, bankId, answer)
                             },
                             onNext = { viewModel.nextQuestion() },
                             onToggleFavorite = {
                                 scope.launch {
-                                    FavoriteManager.toggle(context, question.id)
+                                    val newState = FavoriteManager.toggle(context, question.id)
+                                    favoriteState[question.id] = newState
                                 }
                             }
                         )
@@ -267,7 +275,7 @@ private fun QuestionContent(
         ) {
             // Question type tag
             Text(
-                text = typeLabel(question.type),
+                text = PracticeUtils.typeLabel(question.type),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -433,12 +441,12 @@ private fun SingleChoiceOptions(
     selectedAnswer: String?,
     onAnswer: (String) -> Unit,
 ) {
-    val options = parseOptions(question.options)
+    val options = PracticeUtils.parseOptions(question.options)
     var localSelected by remember(question.id, showAnswer) { mutableStateOf(selectedAnswer) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { index, option ->
-            val label = optionLabels[index]
+            val label = PracticeUtils.optionLabels[index]
             val isSelected = localSelected == label
             val borderColor by animateColorAsState(
                 targetValue = when {
@@ -501,13 +509,13 @@ private fun MultiChoiceOptions(
     selectedAnswer: String?,
     onAnswer: (String) -> Unit,
 ) {
-    val options = parseOptions(question.options)
-    val selectedSet = remember { mutableStateListOf<String>() }
-    var confirmed by remember { mutableStateOf(false) }
+    val options = PracticeUtils.parseOptions(question.options)
+    val selectedSet = remember(question.id) { mutableStateListOf<String>() }
+    var confirmed by remember(question.id) { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { index, option ->
-            val label = optionLabels[index]
+            val label = PracticeUtils.optionLabels[index]
             val isSelected = label in selectedSet
 
             OutlinedCard(
@@ -691,7 +699,7 @@ private fun AnswerFeedback(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "正确答案是: ${formatAnswerDisplay(question.answer)}",
+                    text = "正确答案是: ${PracticeUtils.formatAnswerDisplay(question.answer)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF2E7D32),
                     fontWeight = FontWeight.Medium
@@ -812,19 +820,6 @@ private fun ResultRow(
 }
 
 @Composable
-private fun rememberFavorite(questionId: Long, context: android.content.Context): Boolean {
-    val scope = rememberCoroutineScope()
-    var isFav by remember { mutableStateOf(false) }
-
-    LaunchedEffect(questionId) {
-        isFav = FavoriteManager.isFavorite(context, questionId)
-    }
-
-    // Listen to toggles
-    return isFav
-}
-
-@Composable
 fun PracticeModeDialog(
     bank: com.ck66.dusou.database.entity.QuestionBank,
     onDismiss: () -> Unit,
@@ -903,36 +898,3 @@ private fun ModeOption(
     }
 }
 
-private fun parseOptions(raw: String?): List<String> {
-    if (raw.isNullOrBlank()) return emptyList()
-    // Try JSON array first
-    return try {
-        if (raw.trim().startsWith("[")) {
-            val cleaned = raw.trim().removeSurrounding("[", "]")
-                .split(",")
-                .map { it.trim().removeSurrounding("\"") }
-            cleaned
-        } else {
-            // Split by newlines
-            raw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-        }
-    } catch (e: Exception) {
-        raw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-    }
-}
-
-private val optionLabels = listOf("A", "B", "C", "D", "E", "F")
-
-private fun typeLabel(type: String): String = when (type) {
-    "单选", "单选题" -> "单选题"
-    "多选", "多选题" -> "多选题"
-    "判断", "判断题" -> "判断题"
-    "填空", "填空题" -> "填空题"
-    else -> "单选题"
-}
-
-private fun formatAnswerDisplay(answer: String): String {
-    return answer.map { c ->
-        if (c in 'A'..'Z') "$c" else c.toString()
-    }.joinToString("")
-}

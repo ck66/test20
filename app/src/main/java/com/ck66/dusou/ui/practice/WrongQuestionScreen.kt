@@ -224,7 +224,7 @@ private fun WrongQuestionCard(
             Row {
                 // Correct answer
                 Text(
-                    text = "正确答案: ${formatAnswerDisplay(info.question.answer)}",
+                    text = "正确答案: ${PracticeUtils.formatAnswerDisplay(info.question.answer)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFF2E7D32),
                     fontWeight = FontWeight.Medium
@@ -232,7 +232,7 @@ private fun WrongQuestionCard(
                 Spacer(modifier = Modifier.width(16.dp))
                 // User wrong answer
                 Text(
-                    text = "你的答案: ${formatAnswerDisplay(info.userAnswer)}",
+                    text = "你的答案: ${PracticeUtils.formatAnswerDisplay(info.userAnswer)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFFC62828),
                     fontWeight = FontWeight.Medium
@@ -285,10 +285,4 @@ private fun WrongQuestionCard(
             }
         }
     }
-}
-
-private fun formatAnswerDisplay(answer: String): String {
-    return answer.map { c ->
-        if (c in 'A'..'Z') "$c" else c.toString()
-    }.joinToString("")
 }

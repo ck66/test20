@@ -7,6 +7,11 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -136,14 +141,25 @@ private fun OverlayResultContent(
 ) {
     val question = matchResult.question
     var analysisExpanded by remember { mutableStateOf(false) }
+    var visible by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .widthIn(max = 360.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(16.dp)
+    // 播放入场动画
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 })
     ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 360.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp)
+        ) {
         // Title bar
         Box(
             modifier = Modifier
@@ -252,5 +268,6 @@ private fun OverlayResultContent(
                 Text("关闭")
             }
         }
-    }
+    } // end Column
+    } // end AnimatedVisibility
 }

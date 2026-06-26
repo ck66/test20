@@ -18,6 +18,11 @@ class TextMatcher(
         private const val FTS_TOP_N = 30
         private const val JACCARD_TOP_N = 10
         private const val MATCH_THRESHOLD = 0.65f
+        /**
+         * 编辑距离计算上限，超出此距离的文本直接判 0 相似度。
+         * 设置为 maxLen 的 30%，在长文本场景下有效降低 O(m*n) 开销。
+         */
+        private const val MAX_EDIT_DISTANCE = 30
     }
 
     suspend fun findBestMatch(ocrText: String, bankId: Long? = null): MatchResult {
@@ -96,9 +101,11 @@ class TextMatcher(
     }
 
     private fun levenshteinSimilarity(a: String, b: String): Double {
-        val distance = levenshtein.apply(a, b)
         val maxLen = maxOf(a.length, b.length)
-        return if (maxLen == 0) 1.0 else 1.0 - distance.toDouble() / maxLen
+        if (maxLen == 0) return 1.0
+        // 使用带阈值的 Levenshtein：超出 MAX_EDIT_DISTANCE 直接返回 -1，避免 O(m*n) 全量计算
+        val distance = levenshtein.apply(a, b, MAX_EDIT_DISTANCE)
+        return if (distance < 0) 0.0 else 1.0 - distance.toDouble() / maxLen
     }
 
     private fun buildFtsQuery(ocrText: String): String {

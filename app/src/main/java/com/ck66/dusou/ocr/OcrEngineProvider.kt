@@ -3,10 +3,15 @@ package com.ck66.dusou.ocr
 import android.content.Context
 
 object OcrEngineProvider {
+    @Volatile
     private var engine: OcrEngine? = null
+    private val initLock = Any()
 
     fun init(context: Context) {
-        engine = PaddleOcrEngine(context.applicationContext)
+        synchronized(initLock) {
+            if (engine != null) return
+            engine = PaddleOcrEngine(context.applicationContext)
+        }
     }
 
     fun get(): OcrEngine {
@@ -14,6 +19,8 @@ object OcrEngineProvider {
     }
 
     fun set(engine: OcrEngine) {
-        this.engine = engine
+        synchronized(initLock) {
+            this.engine = engine
+        }
     }
 }

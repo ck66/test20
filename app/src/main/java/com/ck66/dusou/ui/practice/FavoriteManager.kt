@@ -15,15 +15,20 @@ private val FAVORITE_IDS_KEY = stringSetPreferencesKey("favorite_ids")
 
 object FavoriteManager {
 
-    suspend fun toggle(context: Context, questionId: Long) {
+    /** 切换收藏状态，返回新的收藏状态 (true=已收藏) */
+    suspend fun toggle(context: Context, questionId: Long): Boolean {
+        var isNowFavorite = false
         context.dataStore.edit { prefs ->
             val currentIds = prefs[FAVORITE_IDS_KEY] ?: emptySet()
             if (questionId.toString() in currentIds) {
                 prefs[FAVORITE_IDS_KEY] = currentIds - questionId.toString()
+                isNowFavorite = false
             } else {
                 prefs[FAVORITE_IDS_KEY] = currentIds + questionId.toString()
+                isNowFavorite = true
             }
         }
+        return isNowFavorite
     }
 
     suspend fun isFavorite(context: Context, questionId: Long): Boolean {

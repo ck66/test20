@@ -43,9 +43,9 @@ data class ModelConfig(
 
         private fun extractCharacterDict(content: String, assetPath: String): List<String> {
             val lines = content.replace("\r\n", "\n").replace('\r', '\n').lines()
-            val postProcessLine = lines.indexOfFirst { it.trim() == "PostProcess:" }
+            val postProcessLine = lines.indexOfFirst { it.trim().equals("PostProcess:", ignoreCase = true) }
             if (postProcessLine < 0) {
-                throw OCRError.ConfigParseFailed("Missing PostProcess in $assetPath")
+                throw OCRError.ConfigParseFailed("Missing PostProcess section in $assetPath")
             }
 
             val postProcessIndent = YamlUtils.leadingSpaces(lines[postProcessLine])
@@ -98,7 +98,7 @@ data class ModelConfig(
                 }
                 val indent = YamlUtils.leadingSpaces(line)
                 if (indent <= postProcessIndent) break
-                if (trimmed == "character_dict:") return lineIndex
+                if (trimmed.equals("character_dict:", ignoreCase = true)) return lineIndex
                 lineIndex++
             }
             return -1

@@ -6,6 +6,8 @@ import com.ck66.dusou.data.repository.QuestionRepository
 import com.ck66.dusou.database.entity.PracticeRecord
 import com.ck66.dusou.database.entity.Question
 import com.ck66.dusou.database.model.PracticeStats
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,6 +15,22 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 enum class PracticeMode { SEQUENTIAL, RANDOM, WRONG, FAVORITE }
+
+class PracticeViewModelFactory(
+    private val repository: QuestionRepository,
+    private val bankId: Long
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : androidx.lifecycle.ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras
+    ): T {
+        if (modelClass.isAssignableFrom(PracticeViewModel::class.java)) {
+            return PracticeViewModel(repository, bankId) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
 
 sealed interface PracticeUiState {
     data object Loading : PracticeUiState
@@ -41,6 +59,11 @@ class PracticeViewModel(
     private val bankId: Long
 ) : ViewModel() {
 
+    companion object {
+        /** 随机练习默认抽取题目数 */
+        const val RANDOM_QUESTION_COUNT = 20
+    }
+
     private val _uiState = MutableStateFlow<PracticeUiState>(PracticeUiState.Loading)
     val uiState: StateFlow<PracticeUiState> = _uiState.asStateFlow()
 
@@ -60,7 +83,7 @@ class PracticeViewModel(
                         questions = repository.getQuestions(bankId, Int.MAX_VALUE, 0).first()
                     }
                     PracticeMode.RANDOM -> {
-                        questions = repository.getRandomQuestions(bankId, 20)
+                        questions = repository.getRandomQuestions(bankId, RANDOM_QUESTION_COUNT)
                     }
                     PracticeMode.WRONG -> {
                         questions = repository.getWrongQuestions(bankId).first()

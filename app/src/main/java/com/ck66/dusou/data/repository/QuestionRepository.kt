@@ -37,7 +37,10 @@ class QuestionRepository(private val database: AppDatabase) {
                 throw Exception("文件中没有解析到题目")
             }
 
-            val questions = parsedQuestions.map { pq ->
+            // 去重：相同题目+答案的视为重复（题目 stem 相同但答案不同的保留）
+            val uniqueQuestions = parsedQuestions.distinctBy { "${it.stem.trim()}|${it.answer.trim()}" }
+
+            val questions = uniqueQuestions.map { pq ->
                 Question(
                     bankId = 0,
                     type = pq.type,
@@ -51,7 +54,7 @@ class QuestionRepository(private val database: AppDatabase) {
             val bank = QuestionBank(
                 name = bankName,
                 fileName = fileName,
-                questionCount = questions.size,
+                questionCount = uniqueQuestions.size,
                 importTime = System.currentTimeMillis()
             )
 

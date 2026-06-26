@@ -326,33 +326,21 @@ private fun CameraPreviewContent(
                     enabled = !isProcessing && imageCapture != null,
                     onClick = {
                         val capture = imageCapture ?: return@CaptureButton
-                        val contentValues = ContentValues().apply {
-                            put(MediaStore.Images.Media.DISPLAY_NAME, "dusou_${System.currentTimeMillis()}.jpg")
-                            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
-                            }
-                        }
-
-                        val outputOptions = ImageCapture.OutputFileOptions.Builder(
-                            context.contentResolver,
-                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                            contentValues
-                        ).build()
-
                         capture.takePicture(
-                            outputOptions,
                             Executors.newSingleThreadExecutor(),
-                            object : ImageCapture.OnImageSavedCallback {
-                                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                    // Load bitmap from saved URI
+                            object : ImageCapture.OnImageCapturedCallback() {
+                                override fun onCaptureSuccess(imageProxy: androidx.camera.core.ImageProxy) {
                                     try {
-                                        val uri = output.savedUri ?: return
-                                        val bitmap = android.provider.MediaStore.Images.Media
-                                            .getBitmap(context.contentResolver, uri)
-                                        onCapture(bitmap)
+                                        val bitmap = imageProxyToBitmap(imageProxy)
+                                        if (bitmap != null) {
+                                            onCapture(bitmap)
+                                        } else {
+                                            Toast.makeText(context, "拍照失败：无法处理图像", Toast.LENGTH_SHORT).show()
+                                        }
                                     } catch (_: Exception) {
                                         Toast.makeText(context, "拍照失败", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        imageProxy.close()
                                     }
                                 }
 
@@ -744,5 +732,48 @@ private fun ErrorContent(
         Button(onClick = onRetry) {
             Text("重试")
         }
+}
+
+/**
+ * 从 CameraX ImageProxy 转换为 Bitmap（内存中操作，避免文件 I/O）
+ */
+private fun imageProxyToBitmap(imageProxy: androidx.camera.core.ImageProxy): Bitmap? {
+    val format = imageProxy.format
+    return when (format) {
+        android.graphics.ImageFormat.JPEG, android.graphics.ImageFormat.DEPTH_JPEG -> {
+            val buffer = imageProxy.planes[0].buffer
+            val bytes = ByteArray(buffer.remaining())
+            buffer.get(bytes)
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }
+        android.graphics.ImageFormat.YUV_420_888 -> {
+            val yuvImage = android.graphics.YuvImage(
+                imageProxyToByteArray(imageProxy),
+                android.graphics.ImageFormat.NV21,
+                imageProxy.width,
+                imageProxy.height,
+                null
+            )
+            val out = java.io.ByteArrayOutputStream()
+            yuvImage.compressToJpeg(android.graphics.Rect(0, 0, imageProxy.width, imageProxy.height), 95, out)
+            val jpegBytes = out.toByteArray()
+            android.graphics.BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
+        }
+        else -> null
     }
+}
+
+private fun imageProxyToByteArray(image: androidx.camera.core.ImageProxy): ByteArray {
+    val yBuffer = image.planes[0].buffer
+    val uBuffer = image.planes[1].buffer
+    val vBuffer = image.planes[2].buffer
+    val ySize = yBuffer.remaining()
+    val uSize = uBuffer.remaining()
+    val vSize = vBuffer.remaining()
+    val nv21 = ByteArray(ySize + uSize + vSize)
+    yBuffer.get(nv21, 0, ySize)
+    vBuffer.get(nv21, ySize, vSize)
+    uBuffer.get(nv21, ySize + vSize, uSize)
+    return nv21
+}
 }

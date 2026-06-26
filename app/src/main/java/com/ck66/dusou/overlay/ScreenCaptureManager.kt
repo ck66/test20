@@ -21,12 +21,19 @@ class ScreenCaptureManager private constructor() {
         val instance: ScreenCaptureManager by lazy { ScreenCaptureManager() }
     }
 
+    /** 截屏状态变化监听器 */
+    interface CaptureStateListener {
+        /** 截屏 token 失效（如锁屏/旋转后），需要重新授权 */
+        fun onCaptureFailed()
+    }
+
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private var screenWidth = 0
     private var screenHeight = 0
     private var screenDensity = 0
+    private var captureListener: CaptureStateListener? = null
 
     /** 必须使用 @Volatile，因为 ImageReader 回调在后台线程写入，captureScreen 可能在主线程读取 */
     @Volatile
@@ -49,6 +56,15 @@ class ScreenCaptureManager private constructor() {
 
         val manager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = manager.getMediaProjection(resultCode, data)
+
+        // 注册 MediaProjection 回调，监听 token 失效
+        mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+            override fun onStop() {
+                // Token 失效（锁屏/旋转/用户撤销等），通知外部
+                isCapturing = false
+                captureListener?.onCaptureFailed()
+            }
+        }, null)
 
         imageReader = ImageReader.newInstance(
             screenWidth, screenHeight,
@@ -112,6 +128,10 @@ class ScreenCaptureManager private constructor() {
     }
 
     fun isCapturing(): Boolean = isCapturing
+
+    fun setCaptureListener(listener: CaptureStateListener?) {
+        captureListener = listener
+    }
 
     private fun imageToBitmap(image: Image): Bitmap {
         val planes = image.planes
