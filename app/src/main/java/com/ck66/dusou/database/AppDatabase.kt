@@ -90,9 +90,11 @@ abstract class AppDatabase : RoomDatabase() {
 
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
-                            db.execSQL("PRAGMA journal_mode=WAL")
-                            db.execSQL("PRAGMA synchronous=NORMAL")
-                            db.execSQL("PRAGMA foreign_keys=ON")
+                            // Android 16 (SDK 36) 的 SQLite 升级后 execSQL() 不再接受 PRAGMA，
+                            // 必须用 query() / rawQuery() 执行
+                            db.query("PRAGMA journal_mode=WAL").close()
+                            db.query("PRAGMA synchronous=NORMAL").close()
+                            db.query("PRAGMA foreign_keys=ON").close()
                         }
                     })
                     .build()
