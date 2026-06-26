@@ -732,7 +732,8 @@ private fun ErrorContent(
         Button(onClick = onRetry) {
             Text("重试")
         }
-}
+    } // Column
+} // ErrorContent
 
 /**
  * 从 CameraX ImageProxy 转换为 Bitmap（内存中操作，避免文件 I/O）
@@ -775,5 +776,4 @@ private fun imageProxyToByteArray(image: androidx.camera.core.ImageProxy): ByteA
     vBuffer.get(nv21, ySize, vSize)
     uBuffer.get(nv21, ySize + vSize, uSize)
     return nv21
-}
 }
