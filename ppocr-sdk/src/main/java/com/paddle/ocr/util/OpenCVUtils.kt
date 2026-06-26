@@ -16,6 +16,7 @@ package com.paddle.ocr.util
 
 import android.content.Context
 import android.util.Log
+import org.opencv.android.OpenCVLoader
 
 object OpenCVUtils {
 
@@ -24,8 +25,12 @@ object OpenCVUtils {
     fun init(context: Context): Boolean {
         if (initialized) return true
         try {
-            System.loadLibrary("opencv_java4")
-            initialized = true
+            // 使用 OpenCV 推荐的初始化方式而非 System.loadLibrary，
+            // 在部分 Android 版本上更可靠
+            initialized = OpenCVLoader.initDebug()
+            if (!initialized) {
+                Log.e("OpenCVUtils", "OpenCVLoader.initDebug() 返回 false")
+            }
         } catch (e: UnsatisfiedLinkError) {
             Log.e("OpenCVUtils", "Failed to initialize OpenCV: ${e.message}")
         }

@@ -1,2 +1,4 @@
 -keep class com.paddle.ocr.** { *; }
 -keep class ai.onnxruntime.** { *; }
+-keep class org.opencv.** { *; }
+-dontwarn org.opencv.**

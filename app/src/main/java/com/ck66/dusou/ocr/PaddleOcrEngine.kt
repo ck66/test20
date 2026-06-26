@@ -32,7 +32,9 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
     init {
         initScope.launch {
             try {
-                OpenCVUtils.init(appContext)
+                if (!OpenCVUtils.init(appContext)) {
+                    throw IllegalStateException("OpenCV 初始化失败，OCR 引擎不可用")
+                }
                 val engine = PaddleOCR.create(
                     context = appContext,
                     config = PaddleOCRConfig(
