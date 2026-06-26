@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -54,6 +55,7 @@ import com.ck66.dusou.data.repository.QuestionRepositoryProvider
 import com.ck66.dusou.matcher.TextMatcher
 import com.ck66.dusou.ocr.OcrEngineProvider
 import com.ck66.dusou.ui.bank.BankViewModel
+import com.ck66.dusou.ui.bank.BankViewModelFactory
 import com.ck66.dusou.ui.bank.QuestionBankContent
 import com.ck66.dusou.ui.practice.PracticeMode
 import com.ck66.dusou.ui.practice.PracticeModeDialog
@@ -63,6 +65,7 @@ import com.ck66.dusou.ui.profile.ProfileScreen
 import com.ck66.dusou.ui.search.PhotoSearchScreen
 import com.ck66.dusou.ui.search.SearchUiState
 import com.ck66.dusou.ui.search.SearchViewModel
+import com.ck66.dusou.ui.search.SearchViewModelFactory
 
 private data class BottomNavItem(
     val label: String,
@@ -83,6 +86,14 @@ fun MainScreen() {
         BottomNavItem("我的", Icons.Default.Person),
     )
     var selectedIndex by remember { mutableIntStateOf(0) }
+
+    // 搜题 ViewModel —— 提升到顶层，使用 viewModel() 绑定到 ViewModelStoreOwner 生命周期
+    // 防止 Tab 切换时协程泄漏
+    val ocrEngine = remember { OcrEngineProvider.get() }
+    val textMatcher = remember { TextMatcher() }
+    val searchViewModel: SearchViewModel = viewModel(
+        factory = SearchViewModelFactory(ocrEngine, textMatcher)
+    )
 
     // Search tab state
     var showCamera by remember { mutableStateOf(false) }
@@ -154,11 +165,6 @@ fun MainScreen() {
                 when (selectedIndex) {
                     0 -> {
                         if (showCamera) {
-                            val ocrEngine = remember { OcrEngineProvider.get() }
-                            val textMatcher = remember { TextMatcher() }
-                            val searchViewModel = remember {
-                                SearchViewModel(ocrEngine, textMatcher)
-                            }
                             PhotoSearchScreen(
                                 viewModel = searchViewModel,
                                 onNavigateBack = { showCamera = false },
@@ -166,6 +172,7 @@ fun MainScreen() {
                             )
                         } else {
                             TextSearchScreen(
+                                viewModel = searchViewModel,
                                 onOpenCamera = { showCamera = true },
                                 modifier = Modifier.padding(innerPadding)
                             )
@@ -211,13 +218,11 @@ fun MainScreen() {
 
 @Composable
 fun TextSearchScreen(
+    viewModel: SearchViewModel,
     onOpenCamera: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val ocrEngine = remember { OcrEngineProvider.get() }
-    val textMatcher = remember { TextMatcher() }
-    val viewModel = remember { SearchViewModel(ocrEngine, textMatcher) }
     val uiState by viewModel.uiState.collectAsState()
 
     var searchText by remember { mutableStateOf("") }
@@ -498,7 +503,7 @@ fun QuestionBankScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { QuestionRepositoryProvider.get() }
-    val viewModel = remember { BankViewModel(repository) }
+    val viewModel: BankViewModel = viewModel(factory = BankViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsState()
 
     val filePickerLauncher = rememberLauncherForActivityResult(

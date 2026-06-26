@@ -2,6 +2,7 @@ package com.ck66.dusou.ui.search
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ck66.dusou.matcher.TextMatcher
 import com.ck66.dusou.matcher.MatchResult
@@ -97,5 +98,23 @@ class SearchViewModel(
 
     fun clearCapturedBitmap() {
         _capturedBitmap.value = null
+    }
+}
+
+/**
+ * Factory for SearchViewModel that binds to Compose ViewModelStoreOwner lifecycle.
+ * Using viewModel(factory = ...) ensures the ViewModel survives recomposition
+ * and tab switches, preventing coroutine leaks.
+ */
+class SearchViewModelFactory(
+    private val ocrEngine: OcrEngine,
+    private val textMatcher: TextMatcher
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
+            return SearchViewModel(ocrEngine, textMatcher) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }

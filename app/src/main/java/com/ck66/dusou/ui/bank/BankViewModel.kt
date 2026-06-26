@@ -3,6 +3,7 @@ package com.ck66.dusou.ui.bank
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ck66.dusou.data.repository.QuestionRepository
 import com.ck66.dusou.database.entity.Question
@@ -118,5 +119,20 @@ class BankViewModel(private val repository: QuestionRepository) : ViewModel() {
     fun dismissImportState() {
         currentImportState = ImportState.Idle
         emitSuccessState()
+    }
+}
+
+/**
+ * Factory for BankViewModel that binds to Compose ViewModelStoreOwner lifecycle.
+ * Using viewModel(factory = ...) ensures the ViewModel survives recomposition
+ * and tab switches, preventing coroutine leaks.
+ */
+class BankViewModelFactory(private val repository: QuestionRepository) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(BankViewModel::class.java)) {
+            return BankViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }

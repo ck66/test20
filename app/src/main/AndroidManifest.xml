@@ -44,13 +44,21 @@
         <service
             android:name=".capture.ScreenCaptureService"
             android:foregroundServiceType="mediaProjection|specialUse"
-            android:exported="false" />
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="screen_capture_for_ocr_search" />
+        </service>
 
         <!-- 悬浮球前台服务 -->
         <service
             android:name=".overlay.FloatingBallService"
             android:foregroundServiceType="specialUse"
-            android:exported="false" />
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating_ball_for_screen_search" />
+        </service>
 
         <!-- 读屏搜题引导页 -->
         <activity

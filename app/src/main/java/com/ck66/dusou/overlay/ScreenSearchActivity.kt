@@ -117,29 +117,34 @@ class ScreenSearchActivity : ComponentActivity() {
     }
 
     private fun onMediaProjectionGranted(resultCode: Int, data: Intent) {
-        captureManager.startCapture(this, resultCode, data)
-
-        // 先启动 ScreenCaptureService 前台服务以持有 MediaProjection 生命周期
-        val serviceIntent = Intent(this, ScreenCaptureService::class.java)
+        // ① 先启动 ScreenCaptureService 前台服务（Android 14+ 要求
+        //    FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION 必须在 getMediaProjection() 之前启动）
+        val serviceIntent = Intent(this, ScreenCaptureService::class.java).apply {
+            putExtra("resultCode", resultCode)
+            putExtra("data", data)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
         } else {
             startService(serviceIntent)
         }
 
-        // 设置悬浮球回调并启动悬浮球服务
-        FloatingBallManager.onBallClicked = {
-            performScreenSearch()
-        }
-        FloatingBallManager.show(this)
-
-        // 延迟 finish() 以确保前台服务的 startForeground() 已执行完毕，
-        // 防止 Activity 过早销毁导致 MediaProjection 被系统回收
+        // ② 延迟启动 captureManager，确保 Service 的 startForeground() 执行完毕
+        //    避免 Android 14+ 抛出 SecurityException: Media projections require a
+        //    foreground service of type mediaProjection
         Handler(Looper.getMainLooper()).postDelayed({
+            captureManager.startCapture(this, resultCode, data)
+
+            // 设置悬浮球回调并启动悬浮球服务
+            FloatingBallManager.onBallClicked = {
+                performScreenSearch()
+            }
+            FloatingBallManager.show(this)
+
             if (!isFinishing && !isDestroyed) {
                 finish()
             }
-        }, 300)
+        }, 200)
     }
 
     private fun performScreenSearch() {

@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -337,6 +339,7 @@ private fun CameraPreviewContent(
                     enabled = !isProcessing && imageCapture != null,
                     onClick = {
                         val capture = imageCapture ?: return@CaptureButton
+                        val mainHandler = Handler(Looper.getMainLooper())
                         capture.takePicture(
                             Executors.newSingleThreadExecutor(),
                             object : ImageCapture.OnImageCapturedCallback() {
@@ -346,17 +349,23 @@ private fun CameraPreviewContent(
                                         if (bitmap != null) {
                                             onCapture(bitmap)
                                         } else {
-                                            Toast.makeText(context, "拍照失败：无法处理图像", Toast.LENGTH_SHORT).show()
+                                            mainHandler.post {
+                                                Toast.makeText(context, "拍照失败：无法处理图像", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     } catch (_: Exception) {
-                                        Toast.makeText(context, "拍照失败", Toast.LENGTH_SHORT).show()
+                                        mainHandler.post {
+                                            Toast.makeText(context, "拍照失败", Toast.LENGTH_SHORT).show()
+                                        }
                                     } finally {
                                         imageProxy.close()
                                     }
                                 }
 
                                 override fun onError(exc: ImageCaptureException) {
-                                    Toast.makeText(context, "拍照失败: ${exc.message}", Toast.LENGTH_SHORT).show()
+                                    mainHandler.post {
+                                        Toast.makeText(context, "拍照失败: ${exc.message}", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         )
@@ -760,17 +769,22 @@ private fun imageProxyToBitmap(imageProxy: androidx.camera.core.ImageProxy): Bit
             android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         }
         android.graphics.ImageFormat.YUV_420_888 -> {
-            val yuvImage = android.graphics.YuvImage(
-                imageProxyToByteArray(imageProxy),
-                android.graphics.ImageFormat.NV21,
-                imageProxy.width,
-                imageProxy.height,
+            val nv21Data = imageProxyToByteArray(imageProxy)
+            if (nv21Data.isEmpty()) {
                 null
-            )
-            val out = java.io.ByteArrayOutputStream()
-            yuvImage.compressToJpeg(android.graphics.Rect(0, 0, imageProxy.width, imageProxy.height), 95, out)
-            val jpegBytes = out.toByteArray()
-            android.graphics.BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
+            } else {
+                val yuvImage = android.graphics.YuvImage(
+                    nv21Data,
+                    android.graphics.ImageFormat.NV21,
+                    imageProxy.width,
+                    imageProxy.height,
+                    null
+                )
+                val out = java.io.ByteArrayOutputStream()
+                yuvImage.compressToJpeg(android.graphics.Rect(0, 0, imageProxy.width, imageProxy.height), 95, out)
+                val jpegBytes = out.toByteArray()
+                android.graphics.BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
+            }
         }
         else -> null
     }
@@ -795,8 +809,15 @@ private fun imageProxyToByteArray(image: androidx.camera.core.ImageProxy): ByteA
     val ySize = yBuffer.remaining()
     val uSize = uBuffer.remaining()
     val vSize = vBuffer.remaining()
+
+    // 防御：部分设备的 CameraX 实现中 buffer 可能已被消费导致 remaining()==0
+    if (ySize == 0) {
+        return ByteArray(0)
+    }
+
     val nv21 = ByteArray(ySize + uSize + vSize)
     yBuffer.get(nv21, 0, ySize)
+    // NV21 格式: Y + V + U 交叠
     vBuffer.get(nv21, ySize, vSize)
     uBuffer.get(nv21, ySize + vSize, uSize)
     return nv21
