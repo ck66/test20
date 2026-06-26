@@ -40,6 +40,11 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
                     config = PaddleOCRConfig(
                         detThresh = 0.3f,
                         detBoxThresh = 0.6f,
+                        // 拍照/截屏的图片分辨率很高，必须用 "max" 模式限制长边，
+                        // 否则给 ONNX 检测模型的 tensor 过大 (OOM → InferenceFailed)。
+                        // "min" 模式只放大过小的图，不会缩小大图，不适合相机输入。
+                        detLimitType = "max",
+                        detLimitSideLen = 960,
                     ),
                     engineConfig = EngineConfig(),
                     detModelAssetPath = "models/det/inference.onnx",
