@@ -103,13 +103,14 @@ class QuestionRepository(private val database: AppDatabase) {
         return questionDao.getByBankId(bankId, limit, offset)
     }
 
-    suspend fun searchQuestions(query: String): List<Question> {
+    suspend fun searchQuestions(query: String, bankId: Long? = null): List<Question> {
         if (query.isBlank()) return emptyList()
 
+        val bankFilter = if (bankId != null) " AND bankId = $bankId" else ""
+
         if (!AppDatabase.isFtsAvailable) {
-            // FTS5 不可用，降级为 LIKE 搜索
             return questionDao.searchByFts(SimpleSQLiteQuery(
-                "SELECT * FROM questions WHERE stem LIKE ? OR options LIKE ? OR answer LIKE ?",
+                "SELECT * FROM questions WHERE (stem LIKE ? OR options LIKE ? OR answer LIKE ?)$bankFilter",
                 arrayOf("%$query%", "%$query%", "%$query%")
             ))
         }
@@ -126,13 +127,14 @@ class QuestionRepository(private val database: AppDatabase) {
 
         val sql = """
             SELECT * FROM questions
-            WHERE id IN (SELECT rowid FROM questions_fts WHERE questions_fts MATCH ?)
+            WHERE id IN (SELECT rowid FROM questions_fts WHERE questions_fts MATCH ?)$bankFilter
         """.trimIndent()
 
         return questionDao.searchByFts(SimpleSQLiteQuery(sql, arrayOf(ftsQuery)))
     }
 
     suspend fun getRandomQuestions(bankId: Long, count: Int): List<Question> {
+        if (count <= 0) return emptyList()
         return questionDao.getRandom(bankId, count)
     }
 

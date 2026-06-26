@@ -60,6 +60,27 @@ abstract class AppDatabase : RoomDatabase() {
                                         tokenize='unicode61'
                                     )
                                 """.trimIndent())
+                                // 添加 FTS 同步触发器，保证 INSERT/UPDATE/DELETE 自动更新 FTS 索引
+                                db.execSQL("""
+                                    CREATE TRIGGER IF NOT EXISTS questions_fts_insert AFTER INSERT ON questions BEGIN
+                                        INSERT INTO questions_fts(rowid, stem, options, answer, analysis)
+                                        VALUES (new.id, new.stem, new.options, new.answer, new.analysis);
+                                    END
+                                """.trimIndent())
+                                db.execSQL("""
+                                    CREATE TRIGGER IF NOT EXISTS questions_fts_delete AFTER DELETE ON questions BEGIN
+                                        INSERT INTO questions_fts(questions_fts, rowid, stem, options, answer, analysis)
+                                        VALUES ('delete', old.id, old.stem, old.options, old.answer, old.analysis);
+                                    END
+                                """.trimIndent())
+                                db.execSQL("""
+                                    CREATE TRIGGER IF NOT EXISTS questions_fts_update AFTER UPDATE ON questions BEGIN
+                                        INSERT INTO questions_fts(questions_fts, rowid, stem, options, answer, analysis)
+                                        VALUES ('delete', old.id, old.stem, old.options, old.answer, old.analysis);
+                                        INSERT INTO questions_fts(rowid, stem, options, answer, analysis)
+                                        VALUES (new.id, new.stem, new.options, new.answer, new.analysis);
+                                    END
+                                """.trimIndent())
                                 isFtsAvailable = true
                             } catch (_: Exception) {
                                 // 设备不支持 FTS5，降级为 LIKE 搜索，不影响应用使用

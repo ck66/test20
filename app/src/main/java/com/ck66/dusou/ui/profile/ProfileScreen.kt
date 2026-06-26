@@ -29,7 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +51,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     var showAboutDialog by remember { mutableStateOf(false) }
 
-    val banks by repository.getAllBanks().collectAsState(initial = emptyList())
+    val banks by repository.getAllBanks().collectAsStateWithLifecycle(initialValue = emptyList())
     val bankCount = banks.size
     val totalQuestions = banks.sumOf { it.questionCount }
 

@@ -505,7 +505,8 @@ fun QuestionBankScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            val bankName = it.lastPathSegment ?: "未命名题库"
+            val bankName = androidx.documentfile.provider.DocumentFile.fromSingleUri(context, it)
+                ?.name ?: it.lastPathSegment ?: "未命名题库"
             viewModel.importBank(context, it, bankName)
         }
     }

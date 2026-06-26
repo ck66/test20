@@ -24,19 +24,19 @@ object PracticeUtils {
         }.joinToString("")
     }
 
-    /** 解析选项字符串为列表 */
+    /** 解析选项字符串为列表。支持 JSON 数组格式和换行分隔格式 */
     fun parseOptions(raw: String?): List<String> {
         if (raw.isNullOrBlank()) return emptyList()
         return try {
             if (raw.trim().startsWith("[")) {
-                val cleaned = raw.trim().removeSurrounding("[", "]")
-                    .split(",")
-                    .map { it.trim().removeSurrounding("\"") }
-                cleaned
+                // 使用 JSONArray 解析，正确支持选项内容中的逗号
+                val jsonArray = org.json.JSONArray(raw.trim())
+                (0 until jsonArray.length()).map { jsonArray.getString(it) }
             } else {
                 raw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
             }
         } catch (e: Exception) {
+            // 解析失败时降级为换行分割
             raw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
         }
     }

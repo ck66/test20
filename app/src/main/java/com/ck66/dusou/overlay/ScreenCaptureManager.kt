@@ -42,6 +42,9 @@ class ScreenCaptureManager private constructor() {
     @Volatile
     private var isCapturing = false
 
+    /** 首帧就绪回调，解决截屏时 latestBitmap 为 null 的问题 */
+    private var firstFrameCallback: (() -> Unit)? = null
+
     fun startCapture(activity: Activity, resultCode: Int, data: Intent) {
         val displayMetrics = DisplayMetrics()
         activity.windowManager.defaultDisplay.getRealMetrics(displayMetrics)
@@ -77,7 +80,11 @@ class ScreenCaptureManager private constructor() {
                 try {
                     image = reader.acquireLatestImage()
                     if (image != null) {
+                        val isFirstFrame = latestBitmap == null
                         latestBitmap = imageToBitmap(image)
+                        if (isFirstFrame) {
+                            firstFrameCallback?.invoke()
+                        }
                     }
                 } catch (_: Exception) {
                     // 忽略单帧异常，不中断屏幕捕获
@@ -131,6 +138,10 @@ class ScreenCaptureManager private constructor() {
 
     fun setCaptureListener(listener: CaptureStateListener?) {
         captureListener = listener
+    }
+
+    fun setFirstFrameCallback(callback: (() -> Unit)?) {
+        firstFrameCallback = callback
     }
 
     private fun imageToBitmap(image: Image): Bitmap {

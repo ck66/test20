@@ -9,8 +9,11 @@ import kotlinx.coroutines.coroutineScope
 import org.apache.commons.text.similarity.LevenshteinDistance
 
 class TextMatcher(
-    private val repository: QuestionRepository = QuestionRepositoryProvider.get()
+    // 允许外部注入 Repository；默认通过 lazy 延迟获取，避免构造时 Provider.get() 未初始化崩溃
+    private val _repository: QuestionRepository? = null
 ) {
+
+    private val repository by lazy { _repository ?: QuestionRepositoryProvider.get() }
 
     /**
      * Levenshtein 实例，在构造时设置阈值避免 O(m*n) 全量计算。
@@ -44,7 +47,7 @@ class TextMatcher(
             // Level 1: FTS 粗筛
             val ftsResults = async {
                 val query = buildFtsQuery(ocrText)
-                repository.searchQuestions(query).take(FTS_TOP_N)
+                repository.searchQuestions(query, bankId).take(FTS_TOP_N)
             }
 
             val ftsQuestions = ftsResults.await()

@@ -268,6 +268,6 @@ private fun OverlayResultContent(
                 Text("关闭")
             }
         }
-    } // end Column
-    } // end AnimatedVisibility
+        }
+    }
 }

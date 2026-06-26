@@ -8,8 +8,11 @@ import com.paddle.ocr.PaddleOCR
 import com.paddle.ocr.PaddleOCRConfig
 import com.paddle.ocr.util.OpenCVUtils
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -22,38 +25,33 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
     private val initLock = Any()
     private val appContext = context.applicationContext
     private val recognitionInProgress = AtomicInteger(0)
+    private val initScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
-        // 在后台线程中初始化 PaddleOCR，避免主线程阻塞
-        Thread({
+        initScope.launch {
             try {
                 OpenCVUtils.init(appContext)
-                // PaddleOCR.create 是 suspend 函数，但我们在非 Android 主线程中
-                // 使用 runBlocking 是安全的，因为这是在后台工作线程中
-                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-                    val engine = PaddleOCR.create(
-                        context = appContext,
-                        config = PaddleOCRConfig(
-                            detThresh = 0.3f,
-                            detBoxThresh = 0.6f,
-                        ),
-                        engineConfig = EngineConfig(),
-                        detModelAssetPath = "models/det/inference.onnx",
-                        recModelAssetPath = "models/rec/inference.onnx",
-                        recConfigAssetPath = "models/rec/inference.yml",
-                    )
-                    synchronized(initLock) {
-                        ocr = engine
-                    }
+                val engine = PaddleOCR.create(
+                    context = appContext,
+                    config = PaddleOCRConfig(
+                        detThresh = 0.3f,
+                        detBoxThresh = 0.6f,
+                    ),
+                    engineConfig = EngineConfig(),
+                    detModelAssetPath = "models/det/inference.onnx",
+                    recModelAssetPath = "models/rec/inference.onnx",
+                    recConfigAssetPath = "models/rec/inference.yml",
+                )
+                synchronized(initLock) {
+                    ocr = engine
                 }
             } catch (e: Throwable) {
-                // CancellationException 是协程取消信号，必须重新抛出
                 if (e is CancellationException) throw e
                 synchronized(initLock) {
                     initError = e
                 }
             }
-        }, "PaddleOCR-Init").start()
+        }
     }
 
     override suspend fun recognize(bitmap: Bitmap): OcrResult {
@@ -128,5 +126,6 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
             ref
         }
         engine?.release()
+        initScope.cancel()
     }
 }

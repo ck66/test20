@@ -19,3 +19,17 @@
 
 # WCDB
 -keep class com.tencent.wcdb.** { *; }
+
+# PaddleOCR SDK
+-keep class com.paddle.ocr.** { *; }
+-dontwarn com.paddle.ocr.**
+
+# Kotlin Metadata (required for reflection-based libraries)
+-keep class kotlin.Metadata { *; }
+
+# Room: keep generated DAO implementations
+-keep class com.ck66.dusou.database.dao.** { *; }
+
+# Commons Text
+-keep class org.apache.commons.text.** { *; }
+-dontwarn org.apache.commons.text.**

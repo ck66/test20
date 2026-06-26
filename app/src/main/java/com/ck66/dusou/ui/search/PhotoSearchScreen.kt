@@ -175,6 +175,16 @@ private fun CameraPreviewContent(
 
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    // 离开页面时解绑相机，防止泄漏
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                cameraProvider?.unbindAll()
+            } catch (_: Exception) {}
+        }
+    }
 
     // Camera permission handling
     var hasCameraPermission by remember {
@@ -278,7 +288,8 @@ private fun CameraPreviewContent(
 
                         val executor = Executors.newSingleThreadExecutor()
                         cameraProviderFuture.addListener({
-                            val cameraProvider = cameraProviderFuture.get()
+                            val provider = cameraProviderFuture.get()
+                            cameraProvider = provider
 
                             val preview = Preview.Builder().build().also {
                                 it.setSurfaceProvider(view.surfaceProvider)
@@ -292,8 +303,8 @@ private fun CameraPreviewContent(
                             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
                             try {
-                                cameraProvider.unbindAll()
-                                cameraProvider.bindToLifecycle(
+                                provider.unbindAll()
+                                provider.bindToLifecycle(
                                     lifecycleOwner,
                                     cameraSelector,
                                     preview,
@@ -737,10 +748,11 @@ private fun ErrorContent(
 
 /**
  * 从 CameraX ImageProxy 转换为 Bitmap（内存中操作，避免文件 I/O）
+ * 处理设备摄像头旋转，确保 OCR 识别方向正确
  */
 private fun imageProxyToBitmap(imageProxy: androidx.camera.core.ImageProxy): Bitmap? {
     val format = imageProxy.format
-    return when (format) {
+    val rawBitmap: Bitmap? = when (format) {
         android.graphics.ImageFormat.JPEG, android.graphics.ImageFormat.DEPTH_JPEG -> {
             val buffer = imageProxy.planes[0].buffer
             val bytes = ByteArray(buffer.remaining())
@@ -761,6 +773,18 @@ private fun imageProxyToBitmap(imageProxy: androidx.camera.core.ImageProxy): Bit
             android.graphics.BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
         }
         else -> null
+    }
+
+    // 处理摄像头旋转：将图片旋转到正确方向
+    rawBitmap ?: return null
+    val rotation = imageProxy.imageInfo.rotationDegrees
+    return if (rotation != 0) {
+        val matrix = android.graphics.Matrix().apply { postRotate(rotation.toFloat()) }
+        Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true).also {
+            if (it != rawBitmap) rawBitmap.recycle()
+        }
+    } else {
+        rawBitmap
     }
 }
 

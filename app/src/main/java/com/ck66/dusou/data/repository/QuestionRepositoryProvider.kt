@@ -1,19 +1,22 @@
 package com.ck66.dusou.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.ck66.dusou.database.AppDatabase
 
 object QuestionRepositoryProvider {
 
+    private const val TAG = "RepoProvider"
+
     @Synchronized
     fun init(context: Context) {
-        // 主动触发 AppDatabase 和 QuestionRepository 的初始化，确保后台线程完成准备工作
         try {
             val app = context.applicationContext
             repository = QuestionRepository(AppDatabase.getInstance(app))
             initialized = true
         } catch (e: Exception) {
-            // 初始化失败记录日志，后续 get() 会抛出更明确的错误
+            // 初始化失败记录日志，后续 get() 会把原始异常作为 cause 抛出
+            Log.e(TAG, "QuestionRepositoryProvider 初始化失败", e)
             lastInitError = e
         }
     }
