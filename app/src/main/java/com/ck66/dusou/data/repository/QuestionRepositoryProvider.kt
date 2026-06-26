@@ -5,6 +5,7 @@ import com.ck66.dusou.database.AppDatabase
 
 object QuestionRepositoryProvider {
 
+    @Synchronized
     fun init(context: Context) {
         // 主动触发 AppDatabase 和 QuestionRepository 的初始化，确保后台线程完成准备工作
         try {

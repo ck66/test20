@@ -111,9 +111,15 @@ class QuestionRepository(private val database: AppDatabase) {
             ))
         }
 
-        val ftsQuery = query.trim().split("\\s+".toRegex())
-            .filter { it.isNotBlank() }
-            .joinToString(" ") { "$it*" }
+        // 如果 query 已经由 TextMatcher.buildFtsQuery() 生成（包含 * 通配符），直接使用
+        // 避免二次处理产生 "关键词**" 等双重星号
+        val ftsQuery = if (query.contains("*")) {
+            query.trim()
+        } else {
+            query.trim().split("\\s+".toRegex())
+                .filter { it.isNotBlank() }
+                .joinToString(" ") { "$it*" }
+        }
 
         val sql = """
             SELECT * FROM questions

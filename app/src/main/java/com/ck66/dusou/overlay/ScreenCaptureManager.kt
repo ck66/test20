@@ -116,6 +116,7 @@ class ScreenCaptureManager private constructor() {
     private fun imageToBitmap(image: Image): Bitmap {
         val planes = image.planes
         val buffer: ByteBuffer = planes[0].buffer
+        buffer.rewind() // 确保 buffer position 在起始位置
         val pixelStride = planes[0].pixelStride
         val rowStride = planes[0].rowStride
         val rowPadding = rowStride - pixelStride * image.width

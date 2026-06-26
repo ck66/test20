@@ -57,7 +57,7 @@ class PracticeViewModel(
             try {
                 when (mode) {
                     PracticeMode.SEQUENTIAL -> {
-                        questions = repository.getQuestions(bankId, 50, 0).first()
+                        questions = repository.getQuestions(bankId, Int.MAX_VALUE, 0).first()
                     }
                     PracticeMode.RANDOM -> {
                         questions = repository.getRandomQuestions(bankId, 20)
@@ -89,7 +89,10 @@ class PracticeViewModel(
     fun submitAnswer(questionId: Long, bankId: Long, userAnswer: String) {
         viewModelScope.launch {
             val question = questions.getOrNull(currentIndex) ?: return@launch
-            val isCorrect = question.answer.trim().equals(userAnswer.trim(), ignoreCase = true)
+
+            val normalizedUser = normalizeAnswer(userAnswer, question.type)
+            val normalizedCorrect = normalizeAnswer(question.answer, question.type)
+            val isCorrect = normalizedUser == normalizedCorrect
 
             val record = PracticeRecord(
                 questionId = questionId,
@@ -149,6 +152,27 @@ class PracticeViewModel(
             } catch (e: Exception) {
                 _uiState.value = PracticeUiState.Error("加载统计失败: ${e.message}")
             }
+        }
+    }
+
+    /**
+     * 标准化答案，处理多选顺序问题和判断题映射问题
+     * - 多选题：排序后比较，避免顺序不同被判错
+     * - 判断题：将"正确"/"错误"映射到"A"/"B"（根据实际题库格式）
+     */
+    private fun normalizeAnswer(answer: String, type: String): String {
+        return when {
+            type == "多选" || type == "多选题" -> {
+                answer.trim().toCharArray().sorted().joinToString("").uppercase()
+            }
+            type == "判断" || type == "判断题" -> {
+                when (answer.trim()) {
+                    "正确", "对", "A", "a" -> "A"
+                    "错误", "错", "B", "b" -> "B"
+                    else -> answer.trim().uppercase()
+                }
+            }
+            else -> answer.trim().uppercase()
         }
     }
 

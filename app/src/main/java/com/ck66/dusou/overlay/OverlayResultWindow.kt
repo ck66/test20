@@ -111,14 +111,19 @@ class OverlayResultWindow(private val context: Context) {
 
     private fun updateComposeContent(matchResult: MatchResult) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        overlayView?.setContent {
-            OverlayResultContent(
-                matchResult = matchResult,
-                onCopyAnswer = { text ->
-                    clipboard.setPrimaryClip(ClipData.newPlainText("answer", text))
-                },
-                onDismiss = { dismiss() }
-            )
+        try {
+            overlayView?.setContent {
+                OverlayResultContent(
+                    matchResult = matchResult,
+                    onCopyAnswer = { text ->
+                        clipboard.setPrimaryClip(ClipData.newPlainText("answer", text))
+                    },
+                    onDismiss = { dismiss() }
+                )
+            }
+        } catch (e: Exception) {
+            // 窗口可能已被系统移除，重置状态
+            isShowing = false
         }
     }
 }

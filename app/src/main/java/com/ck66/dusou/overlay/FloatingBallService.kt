@@ -76,9 +76,12 @@ class FloatingBallService : Service() {
 
     override fun onDestroy() {
         clickCallback = null
-        removeFloatingBall()
-        ScreenCaptureManager.instance.stopCapture()
-        stopService(Intent(this, ScreenCaptureService::class.java))
+        try {
+            removeFloatingBall()
+        } finally {
+            ScreenCaptureManager.instance.stopCapture()
+            stopService(Intent(this, ScreenCaptureService::class.java))
+        }
         super.onDestroy()
     }
 
@@ -131,7 +134,7 @@ class FloatingBallService : Service() {
                     modifier = Modifier
                         .size(BALL_SIZE_DP.dp)
                         .clip(CircleShape)
-                        .background(androidx.compose.ui.graphics.Color(md_theme_light_primary.value.toLong()))
+                        .background(md_theme_light_primary)
                 ) {
                     // Invisible touch layer for drag/click handling via AndroidView
                     AndroidView(

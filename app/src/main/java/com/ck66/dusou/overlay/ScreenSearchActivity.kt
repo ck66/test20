@@ -75,7 +75,7 @@ class ScreenSearchActivity : ComponentActivity() {
             textMatcher = TextMatcher()
         )
 
-        resultWindow = OverlayResultWindow(this)
+        resultWindow = OverlayResultWindow(applicationContext)
 
         observeViewModelState()
 
