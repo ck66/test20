@@ -120,9 +120,13 @@ class PaddleOcrEngine(context: Context) : OcrEngine {
         if (recognitionInProgress.get() > 0) {
             throw IllegalStateException("仍有 ${recognitionInProgress.get()} 个识别任务进行中，无法安全释放")
         }
-        synchronized(initLock) {
-            ocr?.release()
+        // 在锁外释放：recognitionInProgress=0 保证无并发识别
+        // synchronized 仅用于与 waitForInit() 的读写互斥
+        val engine = synchronized(initLock) {
+            val ref = ocr
             ocr = null
+            ref
         }
+        engine?.release()
     }
 }
