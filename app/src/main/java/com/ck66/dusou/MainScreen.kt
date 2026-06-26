@@ -505,8 +505,7 @@ fun QuestionBankScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            val bankName = androidx.documentfile.provider.DocumentFile.fromSingleUri(context, it)
-                ?.name ?: it.lastPathSegment ?: "未命名题库"
+            val bankName = getFileName(context, it) ?: it.lastPathSegment ?: "未命名题库"
             viewModel.importBank(context, it, bankName)
         }
     }
@@ -522,4 +521,21 @@ fun QuestionBankScreen(
         onWrongBook = onWrongBook,
         modifier = modifier
     )
+}
+
+/**
+ * 从 Content URI 获取真实文件名，避免 lastPathSegment 返回 id 而非文件名
+ */
+private fun getFileName(context: android.content.Context, uri: Uri): String? {
+    var name: String? = null
+    try {
+        context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) name = cursor.getString(idx)
+                }
+            }
+    } catch (_: Exception) {}
+    return name
 }
