@@ -53,6 +53,7 @@ class OverlayResultWindow(private val context: Context) {
     private var overlayView: ComposeView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var isShowing = false
+    private var serviceLifecycleOwner: ServiceLifecycleOwner? = null
 
     fun show(matchResult: MatchResult) {
         if (isShowing) {
@@ -63,7 +64,16 @@ class OverlayResultWindow(private val context: Context) {
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
+        // 创建 LifecycleOwner 注入到 ComposeView，否则在系统窗口中
+        // Compose 找不到 ViewTreeLifecycleOwner 会崩溃
+        val lifecycleOwner = ServiceLifecycleOwner().also {
+            serviceLifecycleOwner = it
+        }
+        lifecycleOwner.performStart(null)
+
         val view = ComposeView(context).apply {
+            setViewTreeLifecycleOwner(lifecycleOwner)
+            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
                 OverlayResultContent(
                     matchResult = matchResult,
@@ -110,6 +120,8 @@ class OverlayResultWindow(private val context: Context) {
         layoutParams = null
         windowManager = null
         isShowing = false
+        serviceLifecycleOwner?.performStop()
+        serviceLifecycleOwner = null
     }
 
     fun isShowing(): Boolean = isShowing

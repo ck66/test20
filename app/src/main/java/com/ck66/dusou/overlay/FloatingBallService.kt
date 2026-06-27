@@ -38,6 +38,7 @@ class FloatingBallService : Service() {
     private var initialTouchX = 0f
     private var initialTouchY = 0f
     private var isDragging = false
+    private var serviceLifecycleOwner: ServiceLifecycleOwner? = null
 
     companion object {
         const val CHANNEL_ID = "floating_ball_channel"
@@ -128,7 +129,16 @@ class FloatingBallService : Service() {
     private fun showFloatingBall() {
         val ballSize = (BALL_SIZE_DP * resources.displayMetrics.density).toInt()
 
+        // 创建 LifecycleOwner 注入到 ComposeView，否则在系统窗口（WindowManager）中
+        // Compose 找不到 ViewTreeLifecycleOwner 会崩溃
+        val lifecycleOwner = ServiceLifecycleOwner().also {
+            serviceLifecycleOwner = it
+        }
+        lifecycleOwner.performStart(null)
+
         val ballView = ComposeView(this).apply {
+            setViewTreeLifecycleOwner(lifecycleOwner)
+            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
                 Box(
                     modifier = Modifier
@@ -216,5 +226,7 @@ class FloatingBallService : Service() {
             } catch (_: Exception) {}
         }
         floatingBall = null
+        serviceLifecycleOwner?.performStop()
+        serviceLifecycleOwner = null
     }
 }
