@@ -38,7 +38,6 @@ object FileLogger {
     private var _enabled = false
     private var _enabledCategories: Set<String> = emptySet()
 
-    @Volatile
     var isEnabled: Boolean
         get() = _enabled
         set(value) {
