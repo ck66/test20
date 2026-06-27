@@ -164,6 +164,7 @@ private fun categoryLabel(category: String): String = when (category) {
     "OCR" -> "OCR 识别"
     "Search" -> "搜索查询"
     "Match" -> "匹配结果"
+    "QuestionRepository" -> "题库仓库"
     else -> category
 }
 
@@ -175,5 +176,6 @@ private fun categoryDesc(category: String): String = when (category) {
     "OCR" -> "引擎 · 文字"
     "Search" -> "关键词查询"
     "Match" -> "相似度分数"
+    "QuestionRepository" -> "FTS索引 · SQL"
     else -> ""
 }

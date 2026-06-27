@@ -14,6 +14,7 @@ import com.ck66.dusou.database.entity.QuestionBank
 import com.ck66.dusou.database.model.PracticeStats
 import com.ck66.dusou.database.model.WrongQuestionInfo
 import com.ck66.dusou.parser.QuizParserFactory
+import com.ck66.dusou.util.FileLogger
 import kotlinx.coroutines.flow.Flow
 
 class QuestionRepository(private val database: AppDatabase) {
@@ -64,9 +65,28 @@ class QuestionRepository(private val database: AppDatabase) {
                 questionDao.insertAll(questionsWithBankId)
 
                 if (AppDatabase.isFtsAvailable) {
-                    database.openHelper.writableDatabase.execSQL(
-                        "INSERT INTO questions_fts(questions_fts) VALUES('rebuild')"
-                    )
+                    try {
+                        database.openHelper.writableDatabase.execSQL(
+                            "INSERT INTO questions_fts(questions_fts) VALUES('rebuild')"
+                        )
+                        // 验证 rebuild 后的索引行数
+                        val cursor = database.openHelper.readableDatabase
+                            .query("SELECT COUNT(*) FROM questions_fts")
+                        cursor.use {
+                            if (it.moveToFirst()) {
+                                FileLogger.i("QuestionRepository", "FTS rebuild done, fts_rows=${it.getInt(0)}")
+                            }
+                        }
+                        val cursor2 = database.openHelper.readableDatabase
+                            .query("SELECT COUNT(*) FROM questions")
+                        cursor2.use {
+                            if (it.moveToFirst()) {
+                                FileLogger.i("QuestionRepository", "questions table rows=${it.getInt(0)}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        FileLogger.e("QuestionRepository", "FTS rebuild failed: ${e.message}")
+                    }
                 }
 
                 id
@@ -106,12 +126,22 @@ class QuestionRepository(private val database: AppDatabase) {
     suspend fun searchQuestions(query: String, bankId: Long? = null): List<Question> {
         if (query.isBlank()) return emptyList()
 
+        FileLogger.i("QuestionRepository", "searchQuestions: query='$query', bankId=$bankId, isFtsAvailable=${AppDatabase.isFtsAvailable}")
+
         val bankFilter = if (bankId != null) " AND bankId = $bankId" else ""
 
         if (!AppDatabase.isFtsAvailable) {
+            // 降级 LIKE 搜索：query 可能是 FTS5 OR 语法，需提取纯关键词
+            val plainKeywords = query.split(" OR ").mapNotNull {
+                it.trim().trim('"', '*', ' ').takeIf { w -> w.length >= 2 }
+            }
+            if (plainKeywords.isEmpty()) return emptyList()
+            val likeCondition = plainKeywords.joinToString(" OR ") { kw ->
+                "(stem LIKE '%$kw%' OR options LIKE '%$kw%' OR answer LIKE '%$kw%')"
+            }
+            FileLogger.i("QuestionRepository", "LIKE fallback: $likeCondition")
             return questionDao.searchByFts(SimpleSQLiteQuery(
-                "SELECT * FROM questions WHERE (stem LIKE ? OR options LIKE ? OR answer LIKE ?)$bankFilter",
-                arrayOf("%$query%", "%$query%", "%$query%")
+                "SELECT * FROM questions WHERE ($likeCondition)$bankFilter"
             ))
         }
 
@@ -130,7 +160,10 @@ class QuestionRepository(private val database: AppDatabase) {
             WHERE id IN (SELECT rowid FROM questions_fts WHERE questions_fts MATCH ?)$bankFilter
         """.trimIndent()
 
-        return questionDao.searchByFts(SimpleSQLiteQuery(sql, arrayOf(ftsQuery)))
+        FileLogger.i("QuestionRepository", "FTS SQL param: $ftsQuery")
+        val results = questionDao.searchByFts(SimpleSQLiteQuery(sql, arrayOf(ftsQuery)))
+        FileLogger.i("QuestionRepository", "FTS search returned ${results.size} results")
+        return results
     }
 
     suspend fun getRandomQuestions(bankId: Long, count: Int): List<Question> {

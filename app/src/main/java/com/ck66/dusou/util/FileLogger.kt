@@ -28,6 +28,7 @@ object FileLogger {
         "OCR",
         "Search",
         "Match",
+        "QuestionRepository",
     )
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
