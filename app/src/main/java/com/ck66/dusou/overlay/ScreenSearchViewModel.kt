@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import com.ck66.dusou.matcher.MatchResult
 import com.ck66.dusou.matcher.TextMatcher
 import com.ck66.dusou.ocr.OcrEngine
+import com.ck66.dusou.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +38,7 @@ class ScreenSearchViewModel(
     val state: StateFlow<ScreenSearchState> = _state.asStateFlow()
 
     fun searchFromScreenCapture(bitmap: Bitmap) {
+        FileLogger.i("ScreenSearchVM", "searchFromScreenCapture start, bitmap=${bitmap.width}x${bitmap.height}")
         _state.value = ScreenSearchState.Recognizing
 
         scope.launch {
@@ -45,7 +47,10 @@ class ScreenSearchViewModel(
                     ocrEngine.recognize(bitmap)
                 }
 
+                FileLogger.i("ScreenSearchVM", "OCR done: text='${ocrResult.text.take(300)}', confidence=${ocrResult.confidence}, blocks=${ocrResult.blocks.size}")
+
                 if (ocrResult.text.isBlank()) {
+                    FileLogger.w("ScreenSearchVM", "OCR text is blank")
                     _state.value = ScreenSearchState.Error("未能识别到文字，请重试")
                     return@launch
                 }
@@ -56,12 +61,15 @@ class ScreenSearchViewModel(
                     textMatcher.findBestMatch(ocrResult.text)
                 }
 
+                FileLogger.i("ScreenSearchVM", "Match done: matched=${match.matched}, similarity=${match.similarity}, questionId=${match.question?.id}, stem='${match.question?.stem?.take(100)}'")
+
                 if (match.matched && match.question != null) {
                     _state.value = ScreenSearchState.Result(match)
                 } else {
                     _state.value = ScreenSearchState.NotFound(ocrText = ocrResult.text)
                 }
             } catch (e: Exception) {
+                FileLogger.e("ScreenSearchVM", "searchFromScreenCapture failed", e)
                 _state.value = ScreenSearchState.Error("识别失败: ${e.message}")
             }
         }

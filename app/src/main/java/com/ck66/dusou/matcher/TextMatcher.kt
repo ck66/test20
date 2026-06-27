@@ -4,6 +4,7 @@ import com.ck66.dusou.data.repository.QuestionRepository
 import com.ck66.dusou.data.repository.QuestionRepositoryProvider
 import com.ck66.dusou.database.entity.Question
 import com.ck66.dusou.database.entity.QuestionBank
+import com.ck66.dusou.util.FileLogger
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import org.apache.commons.text.similarity.LevenshteinDistance
@@ -33,7 +34,10 @@ class TextMatcher(
     }
 
     suspend fun findBestMatch(ocrText: String, bankId: Long? = null): MatchResult {
+        FileLogger.i("TextMatcher", "findBestMatch: ocrText='${ocrText.take(200)}', bankId=$bankId")
+
         if (ocrText.isBlank()) {
+            FileLogger.w("TextMatcher", "ocrText is blank, returning no match")
             return MatchResult(
                 question = null,
                 bank = null,
@@ -47,12 +51,15 @@ class TextMatcher(
             // Level 1: FTS 粗筛
             val ftsResults = async {
                 val query = buildFtsQuery(ocrText)
+                FileLogger.i("TextMatcher", "FTS query: '$query'")
                 repository.searchQuestions(query, bankId).take(FTS_TOP_N)
             }
 
             val ftsQuestions = ftsResults.await()
+            FileLogger.i("TextMatcher", "FTS results: ${ftsQuestions.size} questions")
 
             if (ftsQuestions.isEmpty()) {
+                FileLogger.w("TextMatcher", "FTS returned empty, no match")
                 return@coroutineScope MatchResult(
                     question = null,
                     bank = null,
@@ -79,6 +86,8 @@ class TextMatcher(
                 val editSimilarity = levenshteinSimilarity(ocrText, question.stem)
                 // Weighted combination: 60% edit distance, 40% Jaccard
                 val combinedSimilarity = (editSimilarity * 0.6f + jaccardScore * 0.4f).toFloat()
+
+                FileLogger.i("TextMatcher", "Best match: stem='${question.stem.take(80)}', jaccard=$jaccardScore, edit=$editSimilarity, combined=$combinedSimilarity, threshold=$MATCH_THRESHOLD")
 
                 MatchResult(
                     question = question,

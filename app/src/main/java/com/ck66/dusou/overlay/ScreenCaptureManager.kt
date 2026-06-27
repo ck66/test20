@@ -13,6 +13,7 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.util.DisplayMetrics
 import android.view.Surface
+import com.ck66.dusou.util.FileLogger
 import java.nio.ByteBuffer
 
 class ScreenCaptureManager private constructor() {
@@ -51,6 +52,8 @@ class ScreenCaptureManager private constructor() {
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
         screenDensity = displayMetrics.densityDpi
+
+        FileLogger.i("ScreenCapture", "startCapture: screen=${screenWidth}x${screenHeight}, density=$screenDensity")
 
         // 验证屏幕尺寸有效性
         if (screenWidth <= 0 || screenHeight <= 0) {
@@ -120,7 +123,9 @@ class ScreenCaptureManager private constructor() {
     }
 
     fun captureScreen(): Bitmap? {
-        val full = latestBitmap ?: return null
+        val full = latestBitmap
+        FileLogger.i("ScreenCapture", "captureScreen: latestBitmap=${full != null}, isCapturing=$isCapturing")
+        if (full == null) return null
         return full.copy(Bitmap.Config.ARGB_8888, false)
     }
 

@@ -32,6 +32,7 @@ import com.ck66.dusou.capture.ScreenCaptureService
 import com.ck66.dusou.matcher.TextMatcher
 import com.ck66.dusou.ocr.OcrEngineProvider
 import com.ck66.dusou.ui.theme.md_theme_light_primary
+import com.ck66.dusou.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -260,11 +261,12 @@ class FloatingBallService : Service() {
             MotionEvent.ACTION_UP -> {
                 if (!isDragging) {
                     val holdDuration = System.currentTimeMillis() - downTime
+                    FileLogger.i("FloatingBall", "Ball clicked, hold=${holdDuration}ms, isDragging=$isDragging")
                     if (holdDuration >= 1000) {
-                        // 长按 1 秒：关闭悬浮球和读屏搜题
+                        FileLogger.i("FloatingBall", "Long press → hide")
                         FloatingBallManager.hide(applicationContext)
                     } else {
-                        // 短按：执行截屏搜题
+                        FileLogger.i("FloatingBall", "Short click → performScreenSearch")
                         performScreenSearch()
                     }
                 }
@@ -275,10 +277,13 @@ class FloatingBallService : Service() {
     }
 
     private fun performScreenSearch() {
+        val isCapturing = ScreenCaptureManager.instance.isCapturing()
         val bitmap = ScreenCaptureManager.instance.captureScreen()
+        FileLogger.i("FloatingBall", "performScreenSearch: isCapturing=$isCapturing, bitmap=${bitmap != null}, size=${bitmap?.width}x${bitmap?.height}")
         if (bitmap != null) {
             searchViewModel?.searchFromScreenCapture(bitmap)
         } else {
+            FileLogger.w("FloatingBall", "captureScreen returned null")
             Toast.makeText(applicationContext, "截屏失败，请重试", Toast.LENGTH_SHORT).show()
         }
     }
