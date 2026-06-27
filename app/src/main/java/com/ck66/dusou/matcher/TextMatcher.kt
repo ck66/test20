@@ -69,21 +69,25 @@ class TextMatcher(
                 )
             }
 
+            // 从 OCR 文本提取题干，去掉选项文字和题型前缀
+            val ocrStem = extractStemFromOcr(ocrText)
+            FileLogger.i("TextMatcher", "ocrStem='$ocrStem'")
+
             // Level 2: Jaccard 2-gram 精排
             val jaccardScored = ftsQuestions.map { question ->
-                val similarity = jaccardSimilarity(ocrText, question.stem)
+                val similarity = jaccardSimilarity(ocrStem, question.stem)
                 question to similarity
             }.sortedByDescending { it.second }
                 .take(JACCARD_TOP_N)
 
             // Level 3: Levenshtein 编辑距离确认
             val bestMatch = jaccardScored.maxByOrNull { (question, _) ->
-                levenshteinSimilarity(ocrText, question.stem)
+                levenshteinSimilarity(ocrStem, question.stem)
             }
 
             if (bestMatch != null) {
                 val (question, jaccardScore) = bestMatch
-                val editSimilarity = levenshteinSimilarity(ocrText, question.stem)
+                val editSimilarity = levenshteinSimilarity(ocrStem, question.stem)
                 // Weighted combination: 60% edit distance, 40% Jaccard
                 val combinedSimilarity = (editSimilarity * 0.6f + jaccardScore * 0.4f).toFloat()
 
@@ -130,6 +134,7 @@ class TextMatcher(
             .trim()
             .split(" ")
             .filter { it.length >= 2 }
+            .distinct()
             .take(10)
             .joinToString(" OR ") { "\"$it\"*" }  // OR 语义：匹配任意关键词即可
 
@@ -138,8 +143,35 @@ class TextMatcher(
                 .replace(Regex("[\"*]"), "")
                 .split(Regex("\\s+"))
                 .filter { it.isNotBlank() }
+                .distinct()
                 .joinToString(" OR ") { "\"$it\"*" }
         }
+    }
+
+    /**
+     * 从 OCR 文本中提取题干部分（去掉选项文字）。
+     * 
+     * 策略：找到第一个选项行（A. / A、/ A）的位置，
+     * 取该行之前的所有文字作为题干。
+     */
+    private fun extractStemFromOcr(ocrText: String): String {
+        // 匹配选项行开头的模式：A. A、 A）等
+        val optionPattern = Regex("""(?m)^\s*[A-Da-d][.、)．]\s*""")
+        val match = optionPattern.find(ocrText)
+
+        val stemText = if (match != null) {
+            ocrText.substring(0, match.range.first).trim()
+        } else {
+            ocrText.trim()
+        }
+
+        // 过滤掉"单选题""多选题""判断题"等题型前缀行
+        return stemText.lines()
+            .filter { line ->
+                !line.matches(Regex("""^\s*(单选题|多选题|判断题|填空题|简答题)\s*$"""))
+            }
+            .joinToString("")
+            .trim()
     }
 }
 

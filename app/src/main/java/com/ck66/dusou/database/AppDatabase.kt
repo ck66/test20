@@ -11,6 +11,7 @@ import com.ck66.dusou.database.dao.QuestionBankDao
 import com.ck66.dusou.database.dao.QuestionDao
 import com.ck66.dusou.database.entity.PracticeRecord
 import com.ck66.dusou.database.entity.Question
+import com.ck66.dusou.util.FileLogger
 import com.ck66.dusou.database.entity.QuestionBank
 
 @Database(
@@ -82,8 +83,9 @@ abstract class AppDatabase : RoomDatabase() {
                                     END
                                 """.trimIndent())
                                 isFtsAvailable = true
-                            } catch (_: Exception) {
+                            } catch (e: Exception) {
                                 // 设备不支持 FTS5，降级为 LIKE 搜索，不影响应用使用
+                                FileLogger.e("AppDatabase", "FTS5 table creation failed: ${e.message}", e)
                                 isFtsAvailable = false
                             }
                         }
