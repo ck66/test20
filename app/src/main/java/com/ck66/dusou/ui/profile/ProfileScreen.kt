@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
@@ -50,6 +51,7 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showLogDialog by remember { mutableStateOf(false) }
 
     val banks by repository.getAllBanks().collectAsStateWithLifecycle(initialValue = emptyList())
     val bankCount = banks.size
@@ -143,6 +145,15 @@ fun ProfileScreen(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
                 SettingsItem(
+                    icon = Icons.Default.BugReport,
+                    title = "日志记录",
+                    subtitle = "控制诊断日志是否写入 Download 目录",
+                    onClick = { showLogDialog = true }
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                SettingsItem(
                     icon = Icons.Default.Info,
                     title = "关于应用",
                     subtitle = "版本信息与开源协议",
@@ -203,6 +214,10 @@ fun ProfileScreen(
 
     if (showAboutDialog) {
         AboutDialog(onDismiss = { showAboutDialog = false })
+    }
+
+    if (showLogDialog) {
+        LogSettingsDialog(onDismiss = { showLogDialog = false })
     }
 }
 
