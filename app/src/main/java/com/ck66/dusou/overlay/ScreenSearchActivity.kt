@@ -37,18 +37,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.lifecycleScope
 import com.ck66.dusou.capture.ScreenCaptureService
-import com.ck66.dusou.matcher.TextMatcher
-import com.ck66.dusou.ocr.OcrEngineProvider
 import com.ck66.dusou.ui.theme.DusouTheme
-import kotlinx.coroutines.launch
 
 class ScreenSearchActivity : ComponentActivity() {
 
     private val captureManager get() = ScreenCaptureManager.instance
-    private lateinit var viewModel: ScreenSearchViewModel
-    private var resultWindow: OverlayResultWindow? = null
 
     private val mediaProjectionLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
@@ -70,42 +64,12 @@ class ScreenSearchActivity : ComponentActivity() {
             return
         }
 
-        viewModel = ScreenSearchViewModel(
-            ocrEngine = OcrEngineProvider.get(),
-            textMatcher = TextMatcher()
-        )
-
-        resultWindow = OverlayResultWindow(applicationContext)
-
-        observeViewModelState()
-
         setContent {
             DusouTheme {
                 PermissionGuideScreen(
                     onGrant = { requestMediaProjection() },
                     onCancel = { finish() }
                 )
-            }
-        }
-    }
-
-    private fun observeViewModelState() {
-        lifecycleScope.launch {
-            viewModel.state.collect { state ->
-                when (state) {
-                    is ScreenSearchState.Result -> {
-                        resultWindow?.show(state.match)
-                    }
-                    is ScreenSearchState.NotFound -> {
-                        resultWindow?.dismiss()
-                        Toast.makeText(applicationContext, "未找到匹配题目", Toast.LENGTH_SHORT).show()
-                    }
-                    is ScreenSearchState.Error -> {
-                        resultWindow?.dismiss()
-                        Toast.makeText(applicationContext, state.message, Toast.LENGTH_SHORT).show()
-                    }
-                    else -> {}
-                }
             }
         }
     }
@@ -119,10 +83,7 @@ class ScreenSearchActivity : ComponentActivity() {
     private fun onMediaProjectionGranted(resultCode: Int, data: Intent) {
         // ① 先启动 ScreenCaptureService 前台服务（Android 14+ 要求
         //    FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION 必须在 getMediaProjection() 之前启动）
-        val serviceIntent = Intent(this, ScreenCaptureService::class.java).apply {
-            putExtra("resultCode", resultCode)
-            putExtra("data", data)
-        }
+        val serviceIntent = Intent(this, ScreenCaptureService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
         } else {
@@ -134,26 +95,11 @@ class ScreenSearchActivity : ComponentActivity() {
         //    foreground service of type mediaProjection
         Handler(Looper.getMainLooper()).postDelayed({
             captureManager.startCapture(this, resultCode, data)
-
-            // 设置悬浮球回调并启动悬浮球服务
-            FloatingBallManager.onBallClicked = {
-                performScreenSearch()
-            }
             FloatingBallManager.show(this)
-
             if (!isFinishing && !isDestroyed) {
                 finish()
             }
         }, 200)
-    }
-
-    private fun performScreenSearch() {
-        val bitmap = captureManager.captureScreen()
-        if (bitmap != null) {
-            viewModel.searchFromScreenCapture(bitmap)
-        } else {
-            Toast.makeText(applicationContext, "截屏失败，请重试", Toast.LENGTH_SHORT).show()
-        }
     }
 
     private fun requestOverlayPermission() {
@@ -169,9 +115,6 @@ class ScreenSearchActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        // 不在 onDestroy 中停止 captureManager
-        // MediaProjection 和 VirtualDisplay 由 ScreenCaptureManager（单例）跨 Activity 生命周期持有
-        // 否则会导致 ScreenCaptureService（FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION）因 MediaProjection 被释放而闪退
         super.onDestroy()
     }
 

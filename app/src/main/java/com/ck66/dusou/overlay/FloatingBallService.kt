@@ -13,9 +13,8 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,10 +24,19 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.ck66.dusou.MainActivity
 import com.ck66.dusou.R
 import com.ck66.dusou.capture.ScreenCaptureService
+import com.ck66.dusou.matcher.TextMatcher
+import com.ck66.dusou.ocr.OcrEngineProvider
 import com.ck66.dusou.ui.theme.md_theme_light_primary
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class FloatingBallService : Service() {
 
@@ -40,14 +48,17 @@ class FloatingBallService : Service() {
     private var initialTouchX = 0f
     private var initialTouchY = 0f
     private var isDragging = false
+    private var downTime = 0L
     private var serviceLifecycleOwner: ServiceLifecycleOwner? = null
+
+    private var searchViewModel: ScreenSearchViewModel? = null
+    private var resultWindow: OverlayResultWindow? = null
+    private var searchScope: CoroutineScope? = null
 
     companion object {
         const val CHANNEL_ID = "floating_ball_channel"
         const val NOTIFICATION_ID = 2001
         private const val BALL_SIZE_DP = 56
-
-        var clickCallback: (() -> Unit)? = null
 
         fun start(context: Context) {
             val intent = Intent(context, FloatingBallService::class.java)
@@ -67,6 +78,34 @@ class FloatingBallService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
+
+        // 初始化搜索组件并收集结果
+        // ViewModel 和 state 收集绑定到 Service 生命周期而非 Activity
+        searchViewModel = ScreenSearchViewModel(
+            ocrEngine = OcrEngineProvider.get(),
+            textMatcher = TextMatcher()
+        )
+        resultWindow = OverlayResultWindow(applicationContext)
+        searchScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+        searchScope?.launch {
+            searchViewModel?.state?.collect { state ->
+                when (state) {
+                    is ScreenSearchState.Result -> {
+                        resultWindow?.show(state.match)
+                    }
+                    is ScreenSearchState.NotFound -> {
+                        resultWindow?.dismiss()
+                        Toast.makeText(applicationContext, "未找到匹配题目", Toast.LENGTH_SHORT).show()
+                    }
+                    is ScreenSearchState.Error -> {
+                        resultWindow?.dismiss()
+                        Toast.makeText(applicationContext, state.message, Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -78,7 +117,13 @@ class FloatingBallService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        clickCallback = null
+        searchScope?.cancel()
+        searchScope = null
+        searchViewModel?.destroy()
+        searchViewModel = null
+        resultWindow?.dismiss()
+        resultWindow = null
+
         try {
             removeFloatingBall()
         } finally {
@@ -190,6 +235,7 @@ class FloatingBallService : Service() {
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                downTime = System.currentTimeMillis()
                 initialX = params.x
                 initialY = params.y
                 initialTouchX = event.rawX
@@ -213,12 +259,28 @@ class FloatingBallService : Service() {
 
             MotionEvent.ACTION_UP -> {
                 if (!isDragging) {
-                    clickCallback?.invoke()
+                    val holdDuration = System.currentTimeMillis() - downTime
+                    if (holdDuration >= 1000) {
+                        // 长按 1 秒：关闭悬浮球和读屏搜题
+                        FloatingBallManager.hide(applicationContext)
+                    } else {
+                        // 短按：执行截屏搜题
+                        performScreenSearch()
+                    }
                 }
                 return true
             }
         }
         return false
+    }
+
+    private fun performScreenSearch() {
+        val bitmap = ScreenCaptureManager.instance.captureScreen()
+        if (bitmap != null) {
+            searchViewModel?.searchFromScreenCapture(bitmap)
+        } else {
+            Toast.makeText(applicationContext, "截屏失败，请重试", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun removeFloatingBall() {
