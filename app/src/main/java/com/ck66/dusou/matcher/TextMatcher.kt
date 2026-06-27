@@ -130,18 +130,21 @@ class TextMatcher(
 
     private fun buildFtsQuery(ocrText: String): String {
         val keywords = ocrText
-            .replace(Regex("[\\p{Punct}\\s]+"), " ")
+            .replace(Regex("""[\p{Punct}\s\p{S}]+"""), " ")
             .trim()
             .split(" ")
             .filter { it.length >= 2 }
             .distinct()
             .take(10)
-            .joinToString(" OR ") { "\"$it\"*" }  // OR 语义：匹配任意关键词即可
+            .map { it.replace("\"", "") }
 
-        return keywords.ifBlank {
+        return if (keywords.isNotEmpty()) {
+            keywords.joinToString(" OR ") { "\"$it\"*" }
+        } else {
+            // fallback
             ocrText.take(20).trim()
-                .replace(Regex("[\"*]"), "")
-                .split(Regex("\\s+"))
+                .replace(Regex("""["*]"""), "")
+                .split(Regex("""\s+"""))
                 .filter { it.isNotBlank() }
                 .distinct()
                 .joinToString(" OR ") { "\"$it\"*" }
