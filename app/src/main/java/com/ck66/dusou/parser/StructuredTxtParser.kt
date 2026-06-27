@@ -123,7 +123,7 @@ class StructuredTxtParser : QuizParser {
         }
     }
 
-    private class LineCandidate(val line: String) {
+    private inner class LineCandidate(val line: String) {
         var isOptionCandidate = false
         var isOption = false       // 确认是选项（经连续性验证）
         var isAnswer = false
