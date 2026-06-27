@@ -4,9 +4,10 @@ object QuizParserFactory {
 
     fun getParser(format: String): QuizParser? {
         return when (format.lowercase().trim()) {
-            "txt" -> TxtQuizParser()
+            "txt" -> SmartTxtParser()
             "json" -> JsonQuizParser()
             "csv" -> CsvQuizParser()
+            "jsonl", "ndjson" -> NdJsonQuizParser()
             else -> null
         }
     }
