@@ -2,6 +2,7 @@ package com.ck66.dusou
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -133,6 +134,7 @@ fun MainScreen() {
         // Check for practice/wrong book navigation
         when (val screen = currentScreen) {
             is Screen.Practice -> {
+                BackHandler { currentScreen = null }
                 val repository = remember { QuestionRepositoryProvider.get() }
                 PracticeScreen(
                     bankId = screen.bankId,
@@ -145,6 +147,7 @@ fun MainScreen() {
             }
 
             is Screen.WrongBook -> {
+                BackHandler { currentScreen = null }
                 val repository = remember { QuestionRepositoryProvider.get() }
                 WrongQuestionScreen(
                     bankId = screen.bankId,
@@ -165,9 +168,16 @@ fun MainScreen() {
                 when (selectedIndex) {
                     0 -> {
                         if (showCamera) {
+                            BackHandler {
+                                showCamera = false
+                                searchViewModel.clearResult()
+                            }
                             PhotoSearchScreen(
                                 viewModel = searchViewModel,
-                                onNavigateBack = { showCamera = false },
+                                onNavigateBack = {
+                                    showCamera = false
+                                    searchViewModel.clearResult()
+                                },
                                 modifier = Modifier.padding(innerPadding)
                             )
                         } else {
