@@ -267,13 +267,7 @@ fun TextSearchScreen(
                 }
             )
 
-            IconButton(onClick = onOpenCamera) {
-                Icon(
-                    imageVector = Icons.Default.Camera,
-                    contentDescription = "拍照搜题",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
