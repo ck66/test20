@@ -8,7 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -50,11 +52,15 @@ class FloatingBallService : Service() {
     private var initialTouchY = 0f
     private var isDragging = false
     private var downTime = 0L
+    private var lastClickTime = 0L
+    private var pendingSingleClick: Runnable? = null
+    private val clickHandler = Handler(Looper.getMainLooper())
     private var serviceLifecycleOwner: ServiceLifecycleOwner? = null
 
     private var searchViewModel: ScreenSearchViewModel? = null
     private var resultWindow: OverlayResultWindow? = null
     private var searchScope: CoroutineScope? = null
+    private var regionOverlay: RegionSelectOverlay? = null
 
     companion object {
         const val CHANNEL_ID = "floating_ball_channel"
@@ -266,8 +272,25 @@ class FloatingBallService : Service() {
                         FileLogger.i("FloatingBall", "Long press → hide")
                         FloatingBallManager.hide(applicationContext)
                     } else {
-                        FileLogger.i("FloatingBall", "Short click → performScreenSearch")
-                        performScreenSearch()
+                        // 双击检测：300ms 内连续两次点击 → 双击 → 区域选择
+                        val now = System.currentTimeMillis()
+                        if (now - lastClickTime < 300 && pendingSingleClick != null) {
+                            // 第二次点击在 300ms 内 → 双击
+                            clickHandler.removeCallbacks(pendingSingleClick!!)
+                            pendingSingleClick = null
+                            FileLogger.i("FloatingBall", "Double click → region select")
+                            onDoubleClick()
+                        } else {
+                            // 第一次点击 → 延迟等待判断是否双击
+                            pendingSingleClick?.let { clickHandler.removeCallbacks(it) }
+                            val runnable = Runnable {
+                                pendingSingleClick = null
+                                performScreenSearch()
+                            }
+                            pendingSingleClick = runnable
+                            clickHandler.postDelayed(runnable, 300)
+                        }
+                        lastClickTime = now
                     }
                 }
                 return true
@@ -277,15 +300,37 @@ class FloatingBallService : Service() {
     }
 
     private fun performScreenSearch() {
-        val isCapturing = ScreenCaptureManager.instance.isCapturing()
-        val bitmap = ScreenCaptureManager.instance.captureScreen()
-        FileLogger.i("FloatingBall", "performScreenSearch: isCapturing=$isCapturing, bitmap=${bitmap != null}, size=${bitmap?.width}x${bitmap?.height}")
-        if (bitmap != null) {
-            searchViewModel?.searchFromScreenCapture(bitmap)
+        val capture = ScreenCaptureManager.instance
+        val isCapturing = capture.isCapturing()
+        val fullBitmap = capture.captureScreen()
+        FileLogger.i("FloatingBall", "performScreenSearch: isCapturing=$isCapturing, bitmap=${fullBitmap != null}, size=${fullBitmap?.width}x${fullBitmap?.height}")
+
+        if (fullBitmap != null) {
+            // 如果有保存的截图区域，裁剪只保留题目部分
+            val searchBitmap = if (capture.hasCropRect()) {
+                val rect = capture.getCropRect()
+                try {
+                    android.graphics.Bitmap.createBitmap(fullBitmap, rect.x, rect.y, rect.w, rect.h).also {
+                        FileLogger.i("FloatingBall", "Cropped region: ${rect.x},${rect.y} ${rect.w}x${rect.h}")
+                    }
+                } catch (e: Exception) {
+                    FileLogger.e("FloatingBall", "Crop failed, using full bitmap", e)
+                    fullBitmap
+                }
+            } else {
+                fullBitmap
+            }
+            searchViewModel?.searchFromScreenCapture(searchBitmap)
         } else {
             FileLogger.w("FloatingBall", "captureScreen returned null")
             Toast.makeText(applicationContext, "截屏失败，请重试", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun onDoubleClick() {
+        regionOverlay?.dismiss()
+        regionOverlay = RegionSelectOverlay(applicationContext)
+        regionOverlay!!.show()
     }
 
     private fun removeFloatingBall() {

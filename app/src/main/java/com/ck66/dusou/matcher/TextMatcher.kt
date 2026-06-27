@@ -131,10 +131,14 @@ class TextMatcher(
             .split(" ")
             .filter { it.length >= 2 }
             .take(10)
-            .joinToString(" ") { "$it*" }
+            .joinToString(" OR ") { "\"$it\"*" }  // OR 语义：匹配任意关键词即可
 
         return keywords.ifBlank {
-            ocrText.take(20).trim().split(" ").joinToString(" ") { "$it*" }
+            ocrText.take(20).trim()
+                .replace(Regex("[\"*]"), "")
+                .split(Regex("\\s+"))
+                .filter { it.isNotBlank() }
+                .joinToString(" OR ") { "\"$it\"*" }
         }
     }
 }

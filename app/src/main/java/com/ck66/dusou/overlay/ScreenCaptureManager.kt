@@ -129,6 +129,29 @@ class ScreenCaptureManager private constructor() {
         return full.copy(Bitmap.Config.ARGB_8888, false)
     }
 
+    /** 保存区域截图坐标（像素，基于屏幕分辨率） */
+    fun saveCropRect(x: Int, y: Int, w: Int, h: Int) {
+        cropX = x
+        cropY = y
+        cropW = w
+        cropH = h
+        hasCropRect = true
+    }
+
+    /** 是否有已保存的截图区域 */
+    fun hasCropRect(): Boolean = hasCropRect
+
+    /** 获取已保存的截图区域坐标 */
+    fun getCropRect(): CropRect = CropRect(cropX, cropY, cropW, cropH)
+
+    data class CropRect(val x: Int, val y: Int, val w: Int, val h: Int)
+
+    private var cropX = 0
+    private var cropY = 0
+    private var cropW = 0
+    private var cropH = 0
+    private var hasCropRect = false
+
     fun captureRegion(x: Int, y: Int, width: Int, height: Int): Bitmap? {
         val full = latestBitmap ?: return null
         val clippedX = x.coerceIn(0, full.width)
