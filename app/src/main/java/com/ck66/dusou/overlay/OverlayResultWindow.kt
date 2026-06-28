@@ -6,6 +6,8 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -59,6 +61,35 @@ class OverlayResultWindow(private val context: Context) {
     private var isShowing = false
     private var serviceLifecycleOwner: ServiceLifecycleOwner? = null
 
+    // 拖动状态
+    private var dragInitialX = 0
+    private var dragInitialY = 0
+    private var dragInitialTouchX = 0f
+    private var dragInitialTouchY = 0f
+    private var isDragging = false
+
+    companion object {
+        private const val PREFS_NAME = "overlay_position_prefs"
+        private const val KEY_POS_X = "overlay_pos_x"
+        private const val KEY_POS_Y = "overlay_pos_y"
+        private const val POS_UNSET = Int.MIN_VALUE
+
+        private fun savePosition(context: Context, x: Int, y: Int) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putInt(KEY_POS_X, x)
+                .putInt(KEY_POS_Y, y)
+                .apply()
+        }
+
+        private fun loadPosition(context: Context): Pair<Int, Int>? {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val x = prefs.getInt(KEY_POS_X, POS_UNSET)
+            val y = prefs.getInt(KEY_POS_Y, POS_UNSET)
+            return if (x != POS_UNSET && y != POS_UNSET) Pair(x, y) else null
+        }
+    }
+
     fun show(matchResult: MatchResult) {
         if (isShowing) {
             updateComposeContent(matchResult)
@@ -99,18 +130,70 @@ class OverlayResultWindow(private val context: Context) {
             else
                 WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.CENTER
-            // alpha 不设，背景半透明由 Compose Column 的 .background(alpha=0.8f) 控制
-            // height 由 Compose 自适应（WRAP_CONTENT + wrapContentHeight + heightIn(max)）
+            gravity = Gravity.TOP or Gravity.START
+
+            // 恢复上次位置，没有则默认居中偏上
+            val savedPos = loadPosition(context)
+            if (savedPos != null) {
+                x = savedPos.first
+                y = savedPos.second
+            } else {
+                val dm = context.resources.displayMetrics
+                x = (dm.widthPixels - 360 * dm.density.toInt()) / 2
+                y = (dm.heightPixels * 0.3).toInt()
+            }
         }
+
+        // 设置拖动监听
+        setupDragListener(view, params)
 
         overlayView = view
         layoutParams = params
         windowManager?.addView(view, params)
         isShowing = true
+    }
+
+    private fun setupDragListener(view: View, params: WindowManager.LayoutParams) {
+        view.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragInitialX = params.x
+                    dragInitialY = params.y
+                    dragInitialTouchX = event.rawX
+                    dragInitialTouchY = event.rawY
+                    isDragging = false
+                    false  // 不消费，让事件传给 Compose 内部按钮
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = (event.rawX - dragInitialTouchX).toInt()
+                    val deltaY = (event.rawY - dragInitialTouchY).toInt()
+                    if (kotlin.math.abs(deltaX) > 15 || kotlin.math.abs(deltaY) > 15) {
+                        isDragging = true
+                        val newX = dragInitialX + deltaX
+                        val newY = dragInitialY + deltaY
+                        val dm = context.resources.displayMetrics
+                        params.x = newX.coerceIn(-dm.widthPixels / 2, dm.widthPixels / 2)
+                        params.y = newY.coerceIn(0, dm.heightPixels - 100)
+                        windowManager?.updateViewLayout(view, params)
+                        true  // 消费事件，阻止传给按钮
+                    } else {
+                        false
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (isDragging) {
+                        savePosition(context, params.x, params.y)
+                        true  // 消费事件，不触发按钮点击
+                    } else {
+                        false  // 不是拖动，让按钮正常响应
+                    }
+                }
+                else -> false
+            }
+        }
     }
 
     fun hide() {
