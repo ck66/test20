@@ -228,7 +228,7 @@ private fun CameraPreviewContent(
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
-        if (capturedBitmap != null) {
+        if (capturedBitmap != null && currentState !is SearchUiState.Idle) {
             // Show captured photo preview
             Column(
                 modifier = Modifier.fillMaxSize(),

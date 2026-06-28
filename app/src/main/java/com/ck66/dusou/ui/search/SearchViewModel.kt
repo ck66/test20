@@ -122,6 +122,7 @@ class SearchViewModel(
 
     fun clearCapturedBitmap() {
         _capturedBitmap.value = null
+        _uiState.value = SearchUiState.Idle
     }
 }
 

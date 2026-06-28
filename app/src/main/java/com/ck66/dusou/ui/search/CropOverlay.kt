@@ -63,6 +63,7 @@ fun CropOverlay(
     val minH = displayRect.height * 0.2f
 
     var dragDir by remember { mutableStateOf(DragDir.NONE) }
+    var dragRect by remember { mutableStateOf<CropRectState?>(null) }
 
     val maskColor = Color.Black.copy(alpha = 0.45f)
     val borderColor = Color(0xFF4285F4)
@@ -78,22 +79,29 @@ fun CropOverlay(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(displayRect, minW, minH, cornerSize, edgeSize, cropRectState) {
-                    var l = rectLeft; var t = rectTop; var r = rectRight; var b = rectBottom
+                .pointerInput(displayRect, minW, minH, cornerSize, edgeSize) {  // ★ 去掉 cropRectState，避免拖拽中断
                     detectDragGestures(
                         onDragStart = { offset ->
-                            l = cropRectState.left; t = cropRectState.top
-                            r = cropRectState.right; b = cropRectState.bottom
-                            dragDir = detectDragDirFn(offset.x, offset.y, l, t, r, b, cornerSize, edgeSize)
+                            dragRect = cropRectState  // 记录拖拽起始坐标
+                            dragDir = detectDragDirFn(offset.x, offset.y,
+                                cropRectState.left, cropRectState.top,
+                                cropRectState.right, cropRectState.bottom,
+                                cornerSize, edgeSize)
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            l = cropRectState.left; t = cropRectState.top
-                            r = cropRectState.right; b = cropRectState.bottom
-                            val (nl, nt, nr, nb) = applyDragFn(dragDir, dragAmount.x, dragAmount.y, l, t, r, b, displayRect, minW, minH)
-                            onCropRectChange(CropRectState(nl, nt, nr, nb))
+                            val current = dragRect ?: return@detectDragGestures
+                            val (nl, nt, nr, nb) = applyDragFn(dragDir, dragAmount.x, dragAmount.y,
+                                current.left, current.top, current.right, current.bottom,
+                                displayRect, minW, minH)
+                            val newRect = CropRectState(nl, nt, nr, nb)
+                            dragRect = newRect
+                            onCropRectChange(newRect)
                         },
-                        onDragEnd = { dragDir = DragDir.NONE }
+                        onDragEnd = {
+                            dragDir = DragDir.NONE
+                            dragRect = null
+                        }
                     )
                 }
         ) {
