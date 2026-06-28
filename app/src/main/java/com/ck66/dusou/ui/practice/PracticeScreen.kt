@@ -592,7 +592,7 @@ private fun TrueFalseOptions(
     selectedAnswer: String?,
     onAnswer: (String) -> Unit,
 ) {
-    var localSelected by remember { mutableStateOf(selectedAnswer) }
+    var localSelected by remember(selectedAnswer) { mutableStateOf(selectedAnswer) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
