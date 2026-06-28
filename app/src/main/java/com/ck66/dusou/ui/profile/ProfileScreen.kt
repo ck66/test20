@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
@@ -52,6 +53,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     var showAboutDialog by remember { mutableStateOf(false) }
     var showLogDialog by remember { mutableStateOf(false) }
+    var showFilterDialog by remember { mutableStateOf(false) }
 
     val banks by repository.getAllBanks().collectAsStateWithLifecycle(initialValue = emptyList())
     val bankCount = banks.size
@@ -154,6 +156,15 @@ fun ProfileScreen(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
                 SettingsItem(
+                    icon = Icons.Default.FilterList,
+                    title = "识别过滤词",
+                    subtitle = "自定义 OCR 识别内容的过滤规则",
+                    onClick = { showFilterDialog = true }
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                SettingsItem(
                     icon = Icons.Default.Info,
                     title = "关于应用",
                     subtitle = "版本信息与开源协议",
@@ -218,6 +229,10 @@ fun ProfileScreen(
 
     if (showLogDialog) {
         LogSettingsDialog(onDismiss = { showLogDialog = false })
+    }
+
+    if (showFilterDialog) {
+        OcrFilterSettingsDialog(onDismiss = { showFilterDialog = false })
     }
 }
 

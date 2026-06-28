@@ -91,7 +91,7 @@ fun MainScreen() {
     // 搜题 ViewModel —— 提升到顶层，使用 viewModel() 绑定到 ViewModelStoreOwner 生命周期
     // 防止 Tab 切换时协程泄漏
     val ocrEngine = remember { OcrEngineProvider.get() }
-    val textMatcher = remember { TextMatcher() }
+    val textMatcher = remember { TextMatcher(context = LocalContext.current) }
     val searchViewModel: SearchViewModel = viewModel(
         factory = SearchViewModelFactory(ocrEngine, textMatcher)
     )

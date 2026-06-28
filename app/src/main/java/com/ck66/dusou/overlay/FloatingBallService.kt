@@ -90,7 +90,7 @@ class FloatingBallService : Service() {
         // ViewModel 和 state 收集绑定到 Service 生命周期而非 Activity
         searchViewModel = ScreenSearchViewModel(
             ocrEngine = OcrEngineProvider.get(),
-            textMatcher = TextMatcher()
+            textMatcher = TextMatcher(context = applicationContext)
         )
         resultWindow = OverlayResultWindow(applicationContext)
         searchScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
