@@ -326,7 +326,7 @@ private class RegionSelectView(context: Context) : View(context) {
         return this * resources.displayMetrics.density
     }
 
-    private fun Int.dpToPx(): Int {
-        return (this * resources.displayMetrics.density).toInt()
+    private fun Int.dpToPx(): Float {
+        return this * resources.displayMetrics.density
     }
 }
