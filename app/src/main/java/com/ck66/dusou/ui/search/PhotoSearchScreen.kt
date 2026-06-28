@@ -22,8 +22,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -126,8 +128,18 @@ fun PhotoSearchScreen(
                         capturedBitmap = capturedBitmap,
                         isProcessing = uiState !is SearchUiState.Idle,
                         currentState = uiState,
-                        onCapture = { bitmap -> viewModel.searchFromBitmap(bitmap) },
+                        onCapture = { bitmap -> viewModel.setCapturedBitmap(bitmap) },
                         onRetake = { viewModel.clearCapturedBitmap() },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                is SearchUiState.Cropping -> {
+                    val bmp = (uiState as SearchUiState.Cropping).bitmap
+                    CropPreviewContent(
+                        bitmap = bmp,
+                        viewModel = viewModel,
+                        isProcessing = false,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -820,4 +832,75 @@ private fun imageProxyToByteArray(image: androidx.camera.core.ImageProxy): ByteA
     vBuffer.get(nv21, ySize, vSize)
     uBuffer.get(nv21, ySize + vSize, uSize)
     return nv21
+}
+
+@Composable
+private fun CropPreviewContent(
+    bitmap: Bitmap,
+    viewModel: SearchViewModel,
+    isProcessing: Boolean,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        val canvasWidth = constraints.maxWidth.toFloat()
+        val canvasHeight = constraints.maxHeight.toFloat()
+
+        // Photo preview
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "拍摄的照片",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Crop overlay
+        if (canvasWidth > 0 && canvasHeight > 0) {
+            CropOverlay(
+                imageWidth = bitmap.width,
+                imageHeight = bitmap.height,
+                canvasWidth = canvasWidth,
+                canvasHeight = canvasHeight,
+                onCropConfirmed = { cropRect ->
+                    viewModel.searchFromCroppedBitmap(bitmap, cropRect)
+                },
+                onSkip = {
+                    viewModel.searchFromBitmapDirect(bitmap)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Bottom buttons
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (isProcessing) {
+                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("处理中...", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    OutlinedButton(onClick = { viewModel.clearCapturedBitmap() }) {
+                        Text("重拍")
+                    }
+                    OutlinedButton(onClick = { viewModel.searchFromBitmapDirect(bitmap) }) {
+                        Text("跳过裁剪")
+                    }
+                    Button(onClick = { viewModel.searchFromBitmapDirect(bitmap) }) {
+                        Text("识别搜题")
+                    }
+                }
+            }
+        }
+    }
 }

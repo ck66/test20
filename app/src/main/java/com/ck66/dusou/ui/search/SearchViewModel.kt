@@ -18,6 +18,7 @@ sealed interface SearchUiState {
     data object Idle : SearchUiState
     data object Recognizing : SearchUiState
     data object Matching : SearchUiState
+    data class Cropping(val bitmap: Bitmap) : SearchUiState
     data class Result(val match: MatchResult) : SearchUiState
     data class NotFound(val ocrText: String) : SearchUiState
     data class Error(val message: String) : SearchUiState
@@ -33,6 +34,29 @@ class SearchViewModel(
 
     private val _capturedBitmap = MutableStateFlow<Bitmap?>(null)
     val capturedBitmap: StateFlow<Bitmap?> = _capturedBitmap.asStateFlow()
+
+    fun setCapturedBitmap(bitmap: Bitmap) {
+        _capturedBitmap.value = bitmap
+        _uiState.value = SearchUiState.Cropping(bitmap)
+    }
+
+    fun searchFromCroppedBitmap(originalBitmap: Bitmap, cropRect: com.ck66.dusou.util.CropRect) {
+        val cropped = Bitmap.createBitmap(
+            originalBitmap,
+            cropRect.x.coerceIn(0, originalBitmap.width),
+            cropRect.y.coerceIn(0, originalBitmap.height),
+            cropRect.width.coerceAtMost(originalBitmap.width - cropRect.x),
+            cropRect.height.coerceAtMost(originalBitmap.height - cropRect.y)
+        )
+        _capturedBitmap.value = cropped
+        searchFromBitmap(cropped)
+    }
+
+    fun searchFromBitmapDirect(bitmap: Bitmap) {
+        // 跳过裁剪，直接 OCR
+        _capturedBitmap.value = bitmap
+        searchFromBitmap(bitmap)
+    }
 
     fun searchFromBitmap(bitmap: Bitmap) {
         _capturedBitmap.value = bitmap
