@@ -46,9 +46,11 @@ class ScreenCaptureManager private constructor() {
     /** 首帧就绪回调，解决截屏时 latestBitmap 为 null 的问题 */
     private var firstFrameCallback: (() -> Unit)? = null
 
-    fun startCapture(activity: Activity, resultCode: Int, data: Intent) {
+    fun startCapture(context: Context, resultCode: Int, data: Intent) {
+        val appContext = context.applicationContext
         val displayMetrics = DisplayMetrics()
-        activity.windowManager.defaultDisplay.getRealMetrics(displayMetrics)
+        val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+        wm.defaultDisplay.getRealMetrics(displayMetrics)
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
         screenDensity = displayMetrics.densityDpi
@@ -60,7 +62,7 @@ class ScreenCaptureManager private constructor() {
             throw IllegalStateException("屏幕尺寸无效: ${screenWidth}x${screenHeight}")
         }
 
-        val manager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val manager = appContext.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = manager.getMediaProjection(resultCode, data)
 
         // 注册 MediaProjection 回调，监听 token 失效
@@ -84,7 +86,9 @@ class ScreenCaptureManager private constructor() {
                     image = reader.acquireLatestImage()
                     if (image != null) {
                         val isFirstFrame = latestBitmap == null
+                        val oldBitmap = latestBitmap
                         latestBitmap = imageToBitmap(image)
+                        oldBitmap?.recycle()  // 回收旧帧，避免 OOM
                         if (isFirstFrame) {
                             firstFrameCallback?.invoke()
                         }
@@ -189,12 +193,17 @@ class ScreenCaptureManager private constructor() {
         val rowStride = planes[0].rowStride
         val rowPadding = rowStride - pixelStride * image.width
 
-        val bitmap = Bitmap.createBitmap(
+        val tempBitmap = Bitmap.createBitmap(
             image.width + rowPadding / pixelStride,
             image.height,
             Bitmap.Config.ARGB_8888
         )
-        bitmap.copyPixelsFromBuffer(buffer)
-        return Bitmap.createBitmap(bitmap, 0, 0, image.width, image.height)
+        tempBitmap.copyPixelsFromBuffer(buffer)
+
+        val result = Bitmap.createBitmap(tempBitmap, 0, 0, image.width, image.height)
+        if (result != tempBitmap) {
+            tempBitmap.recycle()  // 回收中间 Bitmap，避免泄漏
+        }
+        return result
     }
 }

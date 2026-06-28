@@ -94,6 +94,14 @@ fun PhotoSearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     val capturedBitmap by viewModel.capturedBitmap.collectAsState()
 
+    // 共享拍照线程池，避免每次拍照创建新线程泄漏
+    val photoExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) {
+        onDispose {
+            photoExecutor.shutdown()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -288,7 +296,6 @@ private fun CameraPreviewContent(
                         }.also { previewView = it }
                         val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
 
-                        val executor = Executors.newSingleThreadExecutor()
                         cameraProviderFuture.addListener({
                             val provider = cameraProviderFuture.get()
                             cameraProvider = provider
@@ -341,7 +348,7 @@ private fun CameraPreviewContent(
                         val capture = imageCapture ?: return@CaptureButton
                         val mainHandler = Handler(Looper.getMainLooper())
                         capture.takePicture(
-                            Executors.newSingleThreadExecutor(),
+                            photoExecutor,
                             object : ImageCapture.OnImageCapturedCallback() {
                                 override fun onCaptureSuccess(imageProxy: androidx.camera.core.ImageProxy) {
                                     try {

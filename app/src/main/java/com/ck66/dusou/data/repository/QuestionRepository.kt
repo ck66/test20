@@ -25,6 +25,12 @@ class QuestionRepository(private val database: AppDatabase) {
 
     suspend fun importBank(context: Context, uri: Uri, bankName: String): Result<Long> {
         return try {
+            // 大文件检查：超过 50MB 提示用户拆分
+            val fileSize = context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: 0
+            if (fileSize > 50 * 1024 * 1024) {
+                throw Exception("文件过大（${fileSize / 1024 / 1024}MB），请拆分后导入")
+            }
+
             val content = context.contentResolver.openInputStream(uri)?.use { stream ->
                 stream.bufferedReader().readText()
             } ?: throw Exception("无法读取文件")
@@ -136,12 +142,16 @@ class QuestionRepository(private val database: AppDatabase) {
                 it.trim().trim('"', '*', ' ').takeIf { w -> w.length >= 2 }
             }
             if (plainKeywords.isEmpty()) return emptyList()
-            val likeCondition = plainKeywords.joinToString(" OR ") { kw ->
-                "(stem LIKE '%$kw%' OR options LIKE '%$kw%' OR answer LIKE '%$kw%')"
+            val likeCondition = plainKeywords.joinToString(" OR ") {
+                "(stem LIKE ? ESCAPE ? OR options LIKE ? ESCAPE ? OR answer LIKE ? ESCAPE ?)"
             }
+            // 参数化查询：每个关键词对应 3 个 LIKE + 一个 ESCAPE
+            val args = plainKeywords.flatMap { kw ->
+                listOf("%$kw%", "\\", "%$kw%", "\\", "%$kw%", "\\")
+            }.toTypedArray()
             FileLogger.i("QuestionRepository", "LIKE fallback: $likeCondition")
             return questionDao.searchByFts(SimpleSQLiteQuery(
-                "SELECT * FROM questions WHERE ($likeCondition)$bankFilter"
+                "SELECT * FROM questions WHERE ($likeCondition)$bankFilter", args
             ))
         }
 

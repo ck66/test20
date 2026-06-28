@@ -43,6 +43,7 @@ import com.ck66.dusou.ui.theme.DusouTheme
 class ScreenSearchActivity : ComponentActivity() {
 
     private val captureManager get() = ScreenCaptureManager.instance
+    private val pendingHandler = Handler(Looper.getMainLooper())
 
     private val mediaProjectionLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
@@ -93,7 +94,7 @@ class ScreenSearchActivity : ComponentActivity() {
         // ② 延迟启动 captureManager，确保 Service 的 startForeground() 执行完毕
         //    避免 Android 14+ 抛出 SecurityException: Media projections require a
         //    foreground service of type mediaProjection
-        Handler(Looper.getMainLooper()).postDelayed({
+        pendingHandler.postDelayed({
             captureManager.startCapture(this, resultCode, data)
             FloatingBallManager.show(this)
             if (!isFinishing && !isDestroyed) {
@@ -115,6 +116,7 @@ class ScreenSearchActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        pendingHandler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 

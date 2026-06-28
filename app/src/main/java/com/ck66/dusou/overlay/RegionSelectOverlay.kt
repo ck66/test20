@@ -71,6 +71,11 @@ private class RegionSelectView(context: Context) : View(context) {
 
     var onRegionSelected: ((Int, Int, Int, Int) -> Unit)? = null
 
+    init {
+        // 关闭硬件加速，确保 PorterDuff.Mode.CLEAR 镂空效果在所有设备上一致工作
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+    }
+
     // ────────── 画笔 ──────────
     private val bgPaint = Paint().apply {
         color = Color.argb(128, 0, 0, 0)

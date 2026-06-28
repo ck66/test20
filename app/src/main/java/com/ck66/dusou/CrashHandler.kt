@@ -12,22 +12,24 @@ import java.util.Locale
 object CrashHandler {
 
     private var previousHandler: Thread.UncaughtExceptionHandler? = null
+    @Volatile
+    private var crashDir: File? = null
 
-    fun install() {
+    fun install(context: android.content.Context) {
+        crashDir = File(
+            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+            "dusou_crash"
+        )
         previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             writeCrashLog(thread, throwable)
-            // 交给系统默认处理（让 APP 正常崩溃）
             previousHandler?.uncaughtException(thread, throwable)
         }
     }
 
     private fun writeCrashLog(thread: Thread, throwable: Throwable) {
         try {
-            val dir = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "dusou_crash"
-            )
+            val dir = crashDir ?: return
             if (!dir.exists()) dir.mkdirs()
 
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA).format(Date())

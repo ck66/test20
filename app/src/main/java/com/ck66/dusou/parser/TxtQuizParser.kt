@@ -74,10 +74,10 @@ class TxtQuizParser : QuizParser {
     }
 
     private fun extractTag(block: String, tag: String): String? {
-        // 兼容各种标签变体：全角/半角括号、中括号/方括号混合
+        val escapedTag = Regex.escape(tag)
         val patterns = listOf(
-            "\\【$tag】", "\\[$tag\\]", "【$tag]",
-            "[【$tag】", "【$tag】"
+            "【$escapedTag】",       // 全角括号
+            "\\[$escapedTag\\]"      // 半角括号（需转义）
         )
         for (p in patterns) {
             val regex = Regex(p)

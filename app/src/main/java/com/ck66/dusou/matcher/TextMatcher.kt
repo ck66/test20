@@ -249,7 +249,7 @@ class TextMatcher(
                 if (!isFilterEnabled) return@filter true
                 line.isNotBlank() && !filters.any { filter -> line.matches(Regex(filter)) }
             }
-            .joinToString("")
+            .joinToString("\n")
             .trim()
     }
 
@@ -270,7 +270,7 @@ class TextMatcher(
                 !line.matches(Regex("""^\s*答案[:：]\s*[A-Da-d]+\s*$""")) &&
                 !line.matches(Regex("""^\s*[A-Da-d][.、)．]\s*.+$"""))
             }
-            .joinToString("")
+            .joinToString("\n")
             .trim()
     }
 }

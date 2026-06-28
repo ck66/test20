@@ -11,8 +11,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -102,6 +100,8 @@ class OverlayResultWindow(private val context: Context) {
         ).apply {
             gravity = Gravity.CENTER
             alpha = 0.95f
+            // 限制窗口最大高度，避免长内容超出屏幕
+            height = (resources.displayMetrics.heightPixels * 0.7).toInt()
         }
 
         overlayView = view
