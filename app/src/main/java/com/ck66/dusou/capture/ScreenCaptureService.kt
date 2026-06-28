@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -14,6 +15,13 @@ import com.ck66.dusou.R
 import com.ck66.dusou.overlay.ScreenCaptureManager
 
 class ScreenCaptureService : Service() {
+
+    /** 用于 ServiceConnection 绑定确认 Service 已就绪 */
+    inner class LocalBinder : Binder() {
+        fun getService(): ScreenCaptureService = this@ScreenCaptureService
+    }
+
+    private val binder = LocalBinder()
 
     companion object {
         const val CHANNEL_ID = "screen_capture_channel"
@@ -49,7 +57,7 @@ class ScreenCaptureService : Service() {
         return START_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
         ScreenCaptureManager.instance.stopCapture()

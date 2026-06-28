@@ -1,13 +1,15 @@
 package com.ck66.dusou.overlay
 
 import android.app.Activity
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.os.IBinder
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -43,7 +45,30 @@ import com.ck66.dusou.ui.theme.DusouTheme
 class ScreenSearchActivity : ComponentActivity() {
 
     private val captureManager get() = ScreenCaptureManager.instance
-    private val pendingHandler = Handler(Looper.getMainLooper())
+
+    // 保存 MediaProjection 授权结果，待 Service 绑定成功后使用
+    private var pendingResultCode: Int = 0
+    private var pendingData: Intent? = null
+    private var serviceBound = false
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            serviceBound = true
+            // Service 前台通知已显示，可以安全调用 getMediaProjection
+            val data = pendingData ?: return
+            captureManager.startCapture(this@ScreenSearchActivity, pendingResultCode, data)
+            FloatingBallManager.show(this@ScreenSearchActivity)
+            unbindService(this)
+            pendingData = null
+            if (!isFinishing && !isDestroyed) {
+                finish()
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            serviceBound = false
+        }
+    }
 
     private val mediaProjectionLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
@@ -82,8 +107,8 @@ class ScreenSearchActivity : ComponentActivity() {
     }
 
     private fun onMediaProjectionGranted(resultCode: Int, data: Intent) {
-        // ① 先启动 ScreenCaptureService 前台服务（Android 14+ 要求
-        //    FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION 必须在 getMediaProjection() 之前启动）
+        // 先启动 ScreenCaptureService 前台服务（Android 14+ 要求
+        // FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION 必须在 getMediaProjection() 之前启动）
         val serviceIntent = Intent(this, ScreenCaptureService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
@@ -91,16 +116,10 @@ class ScreenSearchActivity : ComponentActivity() {
             startService(serviceIntent)
         }
 
-        // ② 延迟启动 captureManager，确保 Service 的 startForeground() 执行完毕
-        //    避免 Android 14+ 抛出 SecurityException: Media projections require a
-        //    foreground service of type mediaProjection
-        pendingHandler.postDelayed({
-            captureManager.startCapture(this, resultCode, data)
-            FloatingBallManager.show(this)
-            if (!isFinishing && !isDestroyed) {
-                finish()
-            }
-        }, 200)
+        // 保存授权结果，通过 ServiceConnection 等待 Service 就绪后执行
+        pendingResultCode = resultCode
+        pendingData = data
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     private fun requestOverlayPermission() {
@@ -116,7 +135,9 @@ class ScreenSearchActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        pendingHandler.removeCallbacksAndMessages(null)
+        if (serviceBound) {
+            try { unbindService(serviceConnection) } catch (_: Exception) {}
+        }
         super.onDestroy()
     }
 
