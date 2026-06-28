@@ -93,7 +93,6 @@ fun PhotoSearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val capturedBitmap by viewModel.capturedBitmap.collectAsState()
-    val photoExecutor = remember { Executors.newSingleThreadExecutor() }
 
     Scaffold(
         topBar = {
@@ -341,7 +340,7 @@ private fun CameraPreviewContent(
                         val capture = imageCapture ?: return@CaptureButton
                         val mainHandler = Handler(Looper.getMainLooper())
                         capture.takePicture(
-                            photoExecutor,
+                            Executors.newSingleThreadExecutor(),
                             object : ImageCapture.OnImageCapturedCallback() {
                                 override fun onCaptureSuccess(imageProxy: androidx.camera.core.ImageProxy) {
                                     try {
