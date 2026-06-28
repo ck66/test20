@@ -138,6 +138,15 @@ class ScreenCaptureManager private constructor() {
         hasCropRect = true
     }
 
+    /** 清除已保存的区域 */
+    fun clearCropRect() {
+        hasCropRect = false
+        cropX = 0
+        cropY = 0
+        cropW = 0
+        cropH = 0
+    }
+
     /** 是否有已保存的截图区域 */
     fun hasCropRect(): Boolean = hasCropRect
 
