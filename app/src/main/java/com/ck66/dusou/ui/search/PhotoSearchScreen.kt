@@ -93,14 +93,7 @@ fun PhotoSearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val capturedBitmap by viewModel.capturedBitmap.collectAsState()
-
-    // 共享拍照线程池，避免每次拍照创建新线程泄漏
     val photoExecutor = remember { Executors.newSingleThreadExecutor() }
-    DisposableEffect(Unit) {
-        onDispose {
-            photoExecutor.shutdown()
-        }
-    }
 
     Scaffold(
         topBar = {

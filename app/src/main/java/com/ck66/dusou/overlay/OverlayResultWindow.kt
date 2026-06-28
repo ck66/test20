@@ -101,7 +101,7 @@ class OverlayResultWindow(private val context: Context) {
             gravity = Gravity.CENTER
             alpha = 0.95f
             // 限制窗口最大高度，避免长内容超出屏幕
-            height = (resources.displayMetrics.heightPixels * 0.7).toInt()
+            height = (context.resources.displayMetrics.heightPixels * 0.7).toInt()
         }
 
         overlayView = view
