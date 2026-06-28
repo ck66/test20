@@ -309,15 +309,17 @@ class FloatingBallService : Service() {
             // 如果有保存的截图区域，裁剪只保留题目部分
             val searchBitmap = if (capture.hasCropRect()) {
                 val rect = capture.getCropRect()
+                FileLogger.i("FloatingBall", "CropRect: ${rect.x},${rect.y} ${rect.w}x${rect.h}, bitmap=${fullBitmap.width}x${fullBitmap.height}")
                 try {
                     android.graphics.Bitmap.createBitmap(fullBitmap, rect.x, rect.y, rect.w, rect.h).also {
-                        FileLogger.i("FloatingBall", "Cropped region: ${rect.x},${rect.y} ${rect.w}x${rect.h}")
+                        FileLogger.i("FloatingBall", "Cropped region: ${rect.x},${rect.y} ${rect.w}x${rect.h}, result=${it.width}x${it.height}")
                     }
                 } catch (e: Exception) {
                     FileLogger.e("FloatingBall", "Crop failed, using full bitmap", e)
                     fullBitmap
                 }
             } else {
+                FileLogger.i("FloatingBall", "No crop rect, using full bitmap")
                 fullBitmap
             }
             searchViewModel?.searchFromScreenCapture(searchBitmap)

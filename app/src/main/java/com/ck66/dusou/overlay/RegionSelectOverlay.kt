@@ -26,7 +26,15 @@ class RegionSelectOverlay(private val context: Context) {
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val view = RegionSelectView(context).apply {
             onRegionSelected = { x, y, w, h ->
-                ScreenCaptureManager.instance.saveCropRect(x, y, w, h)
+                // 获取状态栏高度，将 overlay 坐标转换为屏幕坐标
+                val resources = context.resources
+                val statusBarHeight = resources.getIdentifier("status_bar_height", "dimen", "android")
+                    .let { if (it > 0) resources.getDimensionPixelSize(it) else 0 }
+
+                // overlay view 的 y 坐标是相对于屏幕顶部（不含状态栏），
+                // 而 latestBitmap 包含状态栏区域，需要加上偏移
+                val adjustedY = y + statusBarHeight
+                ScreenCaptureManager.instance.saveCropRect(x, adjustedY, w, h)
                 Toast.makeText(context, "截图区域已保存", Toast.LENGTH_SHORT).show()
                 dismiss()
             }
