@@ -65,6 +65,9 @@ fun CropOverlay(
     var dragDir by remember { mutableStateOf(DragDir.NONE) }
     var dragRect by remember { mutableStateOf<CropRectState?>(null) }
 
+    // ★ 始终保持最新引用，解决 pointerInput 闭包捕获旧值导致"拖动恢复原大小"
+    val latestCropRect by rememberUpdatedState(cropRectState)
+
     val maskColor = Color.Black.copy(alpha = 0.45f)
     val borderColor = Color(0xFF4285F4)
     val cornerColor = Color.White
@@ -82,10 +85,10 @@ fun CropOverlay(
                 .pointerInput(displayRect, minW, minH, cornerSize, edgeSize) {  // ★ 去掉 cropRectState，避免拖拽中断
                     detectDragGestures(
                         onDragStart = { offset ->
-                            dragRect = cropRectState  // 记录拖拽起始坐标
+                            dragRect = latestCropRect
                             dragDir = detectDragDirFn(offset.x, offset.y,
-                                cropRectState.left, cropRectState.top,
-                                cropRectState.right, cropRectState.bottom,
+                                latestCropRect.left, latestCropRect.top,
+                                latestCropRect.right, latestCropRect.bottom,
                                 cornerSize, edgeSize)
                         },
                         onDrag = { change, dragAmount ->
