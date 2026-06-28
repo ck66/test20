@@ -36,6 +36,8 @@ class SearchViewModel(
     val capturedBitmap: StateFlow<Bitmap?> = _capturedBitmap.asStateFlow()
 
     fun setCapturedBitmap(bitmap: Bitmap) {
+        // 防御：已在裁剪状态时不重复设，避免 CameraX unbind 残留回调震荡
+        if (_uiState.value is SearchUiState.Cropping) return
         _capturedBitmap.value = bitmap
         _uiState.value = SearchUiState.Cropping(bitmap)
     }

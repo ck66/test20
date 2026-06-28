@@ -851,8 +851,10 @@ private fun CropPreviewContent(
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
 
-        // ★ 状态提升：选区坐标在外部持有。key=canvas尺寸确保初始约束正确时重新计算
-        var cropRectState by remember(canvasWidth, canvasHeight) {
+        // 尺寸未就绪时不渲染任何内容，防止零尺寸 + remember 重建导致按钮 click 穿透
+        if (canvasWidth <= 0 || canvasHeight <= 0) return@BoxWithConstraints
+
+        var cropRectState by remember {
             mutableStateOf(calculateDefaultCropRect(canvasWidth, canvasHeight, bitmap.width, bitmap.height))
         }
 
