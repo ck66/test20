@@ -850,6 +850,11 @@ private fun CropPreviewContent(
         val canvasWidth = constraints.maxWidth.toFloat()
         val canvasHeight = constraints.maxHeight.toFloat()
 
+        // ★ 状态提升：选区坐标在外部持有
+        var cropRectState by remember {
+            mutableStateOf(calculateDefaultCropRect(canvasWidth, canvasHeight, bitmap.width, bitmap.height))
+        }
+
         // Photo preview
         Image(
             bitmap = bitmap.asImageBitmap(),
@@ -865,12 +870,8 @@ private fun CropPreviewContent(
                 imageHeight = bitmap.height,
                 canvasWidth = canvasWidth,
                 canvasHeight = canvasHeight,
-                onCropConfirmed = { cropRect ->
-                    viewModel.searchFromCroppedBitmap(bitmap, cropRect)
-                },
-                onSkip = {
-                    viewModel.searchFromBitmapDirect(bitmap)
-                },
+                cropRectState = cropRectState,
+                onCropRectChange = { cropRectState = it },
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -898,11 +899,67 @@ private fun CropPreviewContent(
                     OutlinedButton(onClick = { viewModel.searchFromBitmapDirect(bitmap) }) {
                         Text("跳过裁剪")
                     }
-                    Button(onClick = { viewModel.searchFromBitmapDirect(bitmap) }) {
+                    // ★ 修复：调用裁剪，而非直接用原图
+                    Button(onClick = {
+                        val cropRect = screenToBitmapCoord(
+                            cropRectState, canvasWidth, canvasHeight,
+                            bitmap.width, bitmap.height
+                        )
+                        viewModel.searchFromCroppedBitmap(bitmap, cropRect)
+                    }) {
                         Text("识别搜题")
                     }
                 }
             }
         }
     }
+}
+
+// ==================== 坐标转换工具函数 ====================
+
+private fun calculateDisplayRect(
+    canvasWidth: Float, canvasHeight: Float, imageWidth: Int, imageHeight: Int
+): Rect {
+    val imageAspect = imageWidth.toFloat() / imageHeight
+    val canvasAspect = canvasWidth / canvasHeight
+    return if (imageAspect > canvasAspect) {
+        val displayHeight = canvasWidth / imageAspect
+        val topOffset = (canvasHeight - displayHeight) / 2
+        Rect(0f, topOffset, canvasWidth, topOffset + displayHeight)
+    } else {
+        val displayWidth = canvasHeight * imageAspect
+        val leftOffset = (canvasWidth - displayWidth) / 2
+        Rect(leftOffset, 0f, leftOffset + displayWidth, canvasHeight)
+    }
+}
+
+private fun screenToBitmapCoord(
+    state: CropRectState, canvasWidth: Float, canvasHeight: Float,
+    imageWidth: Int, imageHeight: Int
+): com.ck66.dusou.util.CropRect {
+    val displayRect = calculateDisplayRect(canvasWidth, canvasHeight, imageWidth, imageHeight)
+    val ratioLeft = ((state.left - displayRect.left) / displayRect.width).coerceIn(0f, 1f)
+    val ratioTop = ((state.top - displayRect.top) / displayRect.height).coerceIn(0f, 1f)
+    val ratioRight = ((state.right - displayRect.left) / displayRect.width).coerceIn(0f, 1f)
+    val ratioBottom = ((state.bottom - displayRect.top) / displayRect.height).coerceIn(0f, 1f)
+
+    val x = (ratioLeft * imageWidth).toInt().coerceIn(0, imageWidth - 1)
+    val y = (ratioTop * imageHeight).toInt().coerceIn(0, imageHeight - 1)
+    val w = ((ratioRight - ratioLeft) * imageWidth).toInt().coerceAtLeast(1)
+    val h = ((ratioBottom - ratioTop) * imageHeight).toInt().coerceAtLeast(1)
+
+    val safeW = w.coerceAtMost(imageWidth - x)
+    val safeH = h.coerceAtMost(imageHeight - y)
+    return com.ck66.dusou.util.CropRect(x, y, safeW, safeH)
+}
+
+private fun calculateDefaultCropRect(
+    canvasWidth: Float, canvasHeight: Float, imageWidth: Int, imageHeight: Int
+): CropRectState {
+    val displayRect = calculateDisplayRect(canvasWidth, canvasHeight, imageWidth, imageHeight)
+    val w = displayRect.width * 0.8f
+    val h = displayRect.height * 0.6f
+    val left = displayRect.left + (displayRect.width - w) / 2
+    val top = displayRect.top + (displayRect.height - h) / 2
+    return CropRectState(left, top, left + w, top + h)
 }

@@ -12,15 +12,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ck66.dusou.util.CropPreferences
-import com.ck66.dusou.util.CropRect
 
 private enum class DragDir {
     NONE, MOVE,
@@ -30,12 +27,19 @@ private enum class DragDir {
 }
 
 /**
- * 拍照搜题裁剪选区组件（Compose 实现）。
+ * 裁剪选区状态（屏幕坐标）。
+ */
+data class CropRectState(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float
+)
+
+/**
+ * 拍照搜题裁剪选区组件。
  *
- * - 半透明遮罩 + 透明选区 + 蓝色边框 + 白色四角手柄
- * - 8 方向拖拽（四角缩放 + 四边调宽高 + 中心移动）
- * - 默认选区：上次保存的比例，首次使用 80%×60% 居中
- * - View 坐标 → Bitmap 坐标转换
+ * 选区坐标由外部持有（状态提升），通过 cropRectState/onCropRectChange 双向绑定。
  */
 @Composable
 fun CropOverlay(
@@ -43,38 +47,20 @@ fun CropOverlay(
     imageHeight: Int,
     canvasWidth: Float,
     canvasHeight: Float,
-    onCropConfirmed: (CropRect) -> Unit,
-    onSkip: () -> Unit,
+    cropRectState: CropRectState,
+    onCropRectChange: (CropRectState) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
 
     // 计算图片在 Fit 模式下的实际显示矩形
-    val imageAspect = imageWidth.toFloat() / imageHeight
-    val canvasAspect = canvasWidth / canvasHeight
+    val displayRect = calculateDisplayRectInternal(canvasWidth, canvasHeight, imageWidth, imageHeight)
 
-    val displayRect = if (imageAspect > canvasAspect) {
-        val displayHeight = canvasWidth / imageAspect
-        val topOffset = (canvasHeight - displayHeight) / 2
-        Rect(0f, topOffset, canvasWidth, topOffset + displayHeight)
-    } else {
-        val displayWidth = canvasHeight * imageAspect
-        val leftOffset = (canvasWidth - displayWidth) / 2
-        Rect(leftOffset, 0f, leftOffset + displayWidth, canvasHeight)
-    }
-
-    val savedRatio = remember { CropPreferences.getLastCropRatio(context) }
     val cornerSize = with(density) { 40.dp.toPx() }
     val edgeSize = with(density) { 20.dp.toPx() }
     val minW = displayRect.width * 0.2f
     val minH = displayRect.height * 0.2f
-
-    var rectLeft by remember { mutableFloatStateOf((savedRatio.centerX - savedRatio.widthRatio / 2) * displayRect.width + displayRect.left) }
-    var rectTop by remember { mutableFloatStateOf((savedRatio.centerY - savedRatio.heightRatio / 2) * displayRect.height + displayRect.top) }
-    var rectRight by remember { mutableFloatStateOf((savedRatio.centerX + savedRatio.widthRatio / 2) * displayRect.width + displayRect.left) }
-    var rectBottom by remember { mutableFloatStateOf((savedRatio.centerY + savedRatio.heightRatio / 2) * displayRect.height + displayRect.top) }
 
     var dragDir by remember { mutableStateOf(DragDir.NONE) }
 
@@ -83,23 +69,29 @@ fun CropOverlay(
     val cornerColor = Color.White
     val hintColor = Color.White
 
+    val rectLeft = cropRectState.left
+    val rectTop = cropRectState.top
+    val rectRight = cropRectState.right
+    val rectBottom = cropRectState.bottom
+
     Box(modifier = modifier) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(displayRect, minW, minH, cornerSize, edgeSize) {
-                    var l = rectLeft; var t = rectTop
-                    var r = rectRight; var b = rectBottom
+                .pointerInput(displayRect, minW, minH, cornerSize, edgeSize, cropRectState) {
+                    var l = rectLeft; var t = rectTop; var r = rectRight; var b = rectBottom
                     detectDragGestures(
                         onDragStart = { offset ->
-                            dragDir = detectDragDir(offset.x, offset.y, l, t, r, b, cornerSize, edgeSize)
+                            l = cropRectState.left; t = cropRectState.top
+                            r = cropRectState.right; b = cropRectState.bottom
+                            dragDir = detectDragDirFn(offset.x, offset.y, l, t, r, b, cornerSize, edgeSize)
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            l = rectLeft; t = rectTop; r = rectRight; b = rectBottom
-                            applyDrag(dragDir, dragAmount.x, dragAmount.y, l, t, r, b, displayRect, minW, minH).let { (nl, nt, nr, nb) ->
-                                rectLeft = nl; rectTop = nt; rectRight = nr; rectBottom = nb
-                            }
+                            l = cropRectState.left; t = cropRectState.top
+                            r = cropRectState.right; b = cropRectState.bottom
+                            val (nl, nt, nr, nb) = applyDragFn(dragDir, dragAmount.x, dragAmount.y, l, t, r, b, displayRect, minW, minH)
+                            onCropRectChange(CropRectState(nl, nt, nr, nb))
                         },
                         onDragEnd = { dragDir = DragDir.NONE }
                     )
@@ -134,7 +126,25 @@ fun CropOverlay(
     }
 }
 
-private fun detectDragDir(
+// ==================== 内部辅助函数 ====================
+
+private fun calculateDisplayRectInternal(
+    canvasWidth: Float, canvasHeight: Float, imageWidth: Int, imageHeight: Int
+): Rect {
+    val imageAspect = imageWidth.toFloat() / imageHeight
+    val canvasAspect = canvasWidth / canvasHeight
+    return if (imageAspect > canvasAspect) {
+        val displayHeight = canvasWidth / imageAspect
+        val topOffset = (canvasHeight - displayHeight) / 2
+        Rect(0f, topOffset, canvasWidth, topOffset + displayHeight)
+    } else {
+        val displayWidth = canvasHeight * imageAspect
+        val leftOffset = (canvasWidth - displayWidth) / 2
+        Rect(leftOffset, 0f, leftOffset + displayWidth, canvasHeight)
+    }
+}
+
+private fun detectDragDirFn(
     x: Float, y: Float, l: Float, t: Float, r: Float, b: Float, cs: Float, es: Float
 ): DragDir = when {
     x in (l - cs)..(l + cs) && y in (t - cs)..(t + cs) -> DragDir.RESIZE_TOP_LEFT
@@ -149,7 +159,7 @@ private fun detectDragDir(
     else -> DragDir.NONE
 }
 
-private fun applyDrag(
+private fun applyDragFn(
     dir: DragDir, dx: Float, dy: Float,
     l: Float, t: Float, r: Float, b: Float,
     bounds: Rect, minW: Float, minH: Float
