@@ -118,13 +118,13 @@ class StructuredTxtParser : QuizParser {
         val matches = pattern.findAll(line).toList()
 
         return matches.mapNotNull { match ->
-            val letter = match.groupValues[1].uppercaseChar()
+            val letter = match.groupValues[1].uppercase().first()
             var content = match.groupValues[2].trim()
             // 去掉该片段后可能紧跟着的下一个选项字母内容
             // 例如 "A.1 B.2" 中 A 的内容被匹配为 "1 B.2"，需要截断到下一个 B. 之前
-            val nextOptionIdx = content.indexOf(Regex("""\s+[B-Db-d]\s*[.、．:：]"""))
-            if (nextOptionIdx >= 0) {
-                content = content.substring(0, nextOptionIdx).trim()
+            val nextOptionMarker = Regex("""\s+[B-Db-d]\s*[.、．:：]""").find(content)
+            if (nextOptionMarker != null) {
+                content = content.substring(0, nextOptionMarker.range.first).trim()
             }
             if (letter in 'A'..'D' && content.length >= 1) {
                 OptionSegment(letter, content)
