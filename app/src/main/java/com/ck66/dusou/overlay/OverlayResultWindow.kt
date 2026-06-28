@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ck66.dusou.matcher.MatchResult
+import com.ck66.dusou.ui.theme.DusouTheme
 
 class OverlayResultWindow(private val context: Context) {
 
@@ -77,13 +78,15 @@ class OverlayResultWindow(private val context: Context) {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
-                OverlayResultContent(
-                    matchResult = matchResult,
-                    onCopyAnswer = { text ->
-                        clipboard.setPrimaryClip(ClipData.newPlainText("answer", text))
-                    },
-                    onDismiss = { dismiss() }
-                )
+                DusouTheme {
+                    OverlayResultContent(
+                        matchResult = matchResult,
+                        onCopyAnswer = { text ->
+                            clipboard.setPrimaryClip(ClipData.newPlainText("answer", text))
+                        },
+                        onDismiss = { dismiss() }
+                    )
+                }
             }
         }
 
@@ -134,13 +137,15 @@ class OverlayResultWindow(private val context: Context) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         try {
             overlayView?.setContent {
-                OverlayResultContent(
-                    matchResult = matchResult,
-                    onCopyAnswer = { text ->
-                        clipboard.setPrimaryClip(ClipData.newPlainText("answer", text))
-                    },
-                    onDismiss = { dismiss() }
-                )
+                DusouTheme {
+                    OverlayResultContent(
+                        matchResult = matchResult,
+                        onCopyAnswer = { text ->
+                            clipboard.setPrimaryClip(ClipData.newPlainText("answer", text))
+                        },
+                        onDismiss = { dismiss() }
+                    )
+                }
             }
         } catch (e: Exception) {
             // 窗口可能已被系统移除，重置状态

@@ -33,6 +33,7 @@ import com.ck66.dusou.R
 import com.ck66.dusou.capture.ScreenCaptureService
 import com.ck66.dusou.matcher.TextMatcher
 import com.ck66.dusou.ocr.OcrEngineProvider
+import com.ck66.dusou.ui.theme.DusouTheme
 import com.ck66.dusou.ui.theme.md_theme_light_primary
 import com.ck66.dusou.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
@@ -194,23 +195,25 @@ class FloatingBallService : Service() {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
-                Box(
-                    modifier = Modifier
-                        .size(BALL_SIZE_DP.dp)
-                        .clip(CircleShape)
-                        .background(md_theme_light_primary)
-                ) {
-                    // Invisible touch layer for drag/click handling via AndroidView
-                    AndroidView(
-                        factory = { ctx ->
-                            View(ctx).apply {
-                                setOnTouchListener { _, event ->
-                                    handleBallTouch(event)
+                DusouTheme {
+                    Box(
+                        modifier = Modifier
+                            .size(BALL_SIZE_DP.dp)
+                            .clip(CircleShape)
+                            .background(md_theme_light_primary)
+                    ) {
+                        // Invisible touch layer for drag/click handling via AndroidView
+                        AndroidView(
+                            factory = { ctx ->
+                                View(ctx).apply {
+                                    setOnTouchListener { _, event ->
+                                        handleBallTouch(event)
+                                    }
                                 }
-                            }
-                        },
-                        modifier = Modifier.size(BALL_SIZE_DP.dp)
-                    )
+                            },
+                            modifier = Modifier.size(BALL_SIZE_DP.dp)
+                        )
+                    }
                 }
             }
         }

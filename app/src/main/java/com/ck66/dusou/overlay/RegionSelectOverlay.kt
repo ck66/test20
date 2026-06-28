@@ -87,7 +87,7 @@ private class RegionSelectView(context: Context) : View(context) {
         xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
     }
     private val borderPaint = Paint().apply {
-        color = Color.rgb(66, 133, 244)
+        color = Color.rgb(124, 93, 190)
         style = Paint.Style.STROKE
         strokeWidth = 4f
         isAntiAlias = true
