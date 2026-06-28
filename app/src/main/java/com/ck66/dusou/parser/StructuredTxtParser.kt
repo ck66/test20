@@ -313,9 +313,8 @@ class StructuredTxtParser : QuizParser {
     private fun buildOptionsJson(optionLines: List<Pair<LineRole, String>>): String? {
         if (optionLines.isEmpty()) return null
         val jsonArray = JSONArray()
-        optionLines.forEachIndexed { index, (_, content) ->
-            val letter = 'A' + index
-            jsonArray.put("$letter. $content")
+        optionLines.forEach { (_, content) ->
+            jsonArray.put(content)
         }
         return jsonArray.toString()
     }
@@ -332,17 +331,17 @@ class StructuredTxtParser : QuizParser {
             val opt1 = options[1]
             if ((opt0.contains("正确") || opt0 == "对" || opt0 == "√") &&
                 (opt1.contains("错误") || opt1 == "错" || opt1 == "×")) {
-                return "judge"
+                return "判断"
             }
         }
 
         // 多选题：答案长度 > 1 且全是字母
         if (answer.length > 1 && answer.all { it.isLetter() }) {
-            return "multi"
+            return "多选"
         }
 
         // 有选项 → 单选题；无选项 → 填空题
-        return if (options.isNotEmpty()) "single" else "fill"
+        return if (options.isNotEmpty()) "单选" else "填空"
     }
 
     private fun normalizeAnswer(
@@ -353,7 +352,7 @@ class StructuredTxtParser : QuizParser {
         val trimmed = answer.trim()
 
         return when (type) {
-            "judge" -> {
+            "判断", "judge" -> {
                 val ansValue = extractAnswerValue(trimmed)
                 when (ansValue.uppercase()) {
                     "A", "1" -> "正确"
@@ -365,7 +364,7 @@ class StructuredTxtParser : QuizParser {
                     }
                 }
             }
-            "multi" -> extractAnswerValue(trimmed).filter { it.isLetterOrDigit() }
+            "多选", "multi" -> extractAnswerValue(trimmed).filter { it.isLetterOrDigit() }
             else -> extractAnswerValue(trimmed)
         }
     }

@@ -312,8 +312,16 @@ private fun QuestionContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Options area based on question type
+            // 向后兼容英文 type（旧数据）
+            val displayType = when (question.type) {
+                "judge" -> "判断"
+                "single" -> "单选"
+                "multi" -> "多选"
+                "fill" -> "填空"
+                else -> question.type
+            }
             when {
-                question.type == "多选" || question.type == "多选题" -> {
+                displayType == "多选" || displayType == "多选题" -> {
                     MultiChoiceOptions(
                         question = question,
                         showAnswer = showAnswer,
@@ -322,7 +330,7 @@ private fun QuestionContent(
                     )
                 }
 
-                question.type == "判断" || question.type == "判断题" -> {
+                displayType == "判断" || displayType == "判断题" -> {
                     TrueFalseOptions(
                         showAnswer = showAnswer,
                         selectedAnswer = selectedAnswer,
@@ -330,7 +338,7 @@ private fun QuestionContent(
                     )
                 }
 
-                question.type == "填空" || question.type == "填空题" -> {
+                displayType == "填空" || displayType == "填空题" -> {
                     FillInBlankInput(
                         showAnswer = showAnswer,
                         selectedAnswer = selectedAnswer,

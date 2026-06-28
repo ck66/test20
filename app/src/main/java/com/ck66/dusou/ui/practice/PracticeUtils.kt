@@ -31,7 +31,10 @@ object PracticeUtils {
             if (raw.trim().startsWith("[")) {
                 // 使用 JSONArray 解析，正确支持选项内容中的逗号
                 val jsonArray = org.json.JSONArray(raw.trim())
-                (0 until jsonArray.length()).map { jsonArray.getString(it) }
+                (0 until jsonArray.length()).map {
+                    // 去掉旧数据的字母前缀（兼容已导入的旧题库）
+                    jsonArray.getString(it).replace(Regex("^[A-D]\\s*[.、)．]\\s*"), "")
+                }
             } else {
                 raw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
             }

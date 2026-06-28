@@ -43,12 +43,8 @@ class NdJsonQuizParser : QuizParser {
             ?: obj.optJSONArray("选项")
 
         val optionsJson: String? = if (optionsArray != null && optionsArray.length() > 0) {
-            val formatted = JSONArray()
-            for (i in 0 until optionsArray.length()) {
-                val letter = 'A' + i
-                formatted.put("$letter. ${optionsArray.optString(i, "")}")
-            }
-            formatted.toString()
+            // 不加字母前缀，纯选项内容，由 UI 层负责加标签
+            optionsArray.toString()
         } else null
 
         val ans = obj.optString("ans", obj.optString("answer", obj.optString("答案", "")))
@@ -56,7 +52,7 @@ class NdJsonQuizParser : QuizParser {
         val type = inferType(optionsArray, ans)
 
         // 判断题：A/B → 正确/错误
-        val answer = if (type == "judge" && optionsArray != null) {
+        val answer = if (type == "判断" && optionsArray != null) {
             when (ans.trim().uppercase()) {
                 "A", "1" -> optionsArray.optString(0, "正确")
                 "B", "2" -> optionsArray.optString(1, "错误")
@@ -84,14 +80,14 @@ class NdJsonQuizParser : QuizParser {
                 val opt1 = optionsArray.optString(1, "")
                 if ((opt0 == "正确" || opt0 == "对" || opt0 == "√") &&
                     (opt1 == "错误" || opt1 == "错" || opt1 == "×")) {
-                    return "judge"
+                    return "判断"
                 }
             }
             if (ans.length > 1 && ans.all { it.isLetter() }) {
-                return "multi"
+                return "多选"
             }
-            return "single"
+            return "单选"
         }
-        return "fill"
+        return "填空"
     }
 }

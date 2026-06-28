@@ -184,13 +184,21 @@ class PracticeViewModel(
      * - 判断题：将"正确"/"错误"映射到"A"/"B"（根据实际题库格式）
      */
     private fun normalizeAnswer(answer: String, type: String): String {
+        // 向后兼容英文 type（旧数据）
+        val normalizedType = when (type) {
+            "judge" -> "判断"
+            "single" -> "单选"
+            "multi" -> "多选"
+            "fill" -> "填空"
+            else -> type
+        }
         return when {
-            type == "多选" || type == "多选题" -> {
+            normalizedType == "多选" || normalizedType == "多选题" -> {
                 answer.trim()
                     .replace(Regex("[,，、\\s]"), "")  // 移除所有分隔符
                     .toCharArray().sorted().joinToString("").uppercase()
             }
-            type == "判断" || type == "判断题" -> {
+            normalizedType == "判断" || normalizedType == "判断题" -> {
                 when (answer.trim()) {
                     "正确", "对", "A", "a" -> "A"
                     "错误", "错", "B", "b" -> "B"
