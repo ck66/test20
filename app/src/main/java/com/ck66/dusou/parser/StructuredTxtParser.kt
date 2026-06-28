@@ -18,6 +18,7 @@ import org.json.JSONArray
  * - 有无解析
  * - 判断题（选项为"正确"/"错误"）
  * - 单选题、多选题
+ * - 一行多选项（ABCD 在一行 / AB一行CD一行）
  */
 class StructuredTxtParser : QuizParser {
 
@@ -82,92 +83,178 @@ class StructuredTxtParser : QuizParser {
         )
     }
 
-    // ==================== 逐行角色判定 ====================
+    // ==================== 逐行角色判定（片段级） ====================
 
     private enum class LineRole { STEM, OPTION, ANSWER, ANALYSIS }
+
+    /**
+     * 选项片段：一行中的单个选项。
+     * 例如 "A.1 B.2" 会拆成 OptionSegment('A', "1") 和 OptionSegment('B', "2")
+     */
+    private data class OptionSegment(val letter: Char, val content: String)
+
+    /**
+     * 一行文本及其选项片段。
+     */
+    private class LineSegments(
+        val original: String,
+        val segments: List<OptionSegment>
+    ) {
+        var isOption = false
+    }
+
+    /**
+     * 将一行文本拆分为多个选项片段。
+     *
+     * 匹配模式：
+     * - A. xxx B. xxx C. xxx D. xxx（一行多选）
+     * - A.xxx B.xxx（无空格）
+     *
+     * 返回每行的选项片段列表。
+     */
+    private fun splitOptionsInLine(line: String): List<OptionSegment> {
+        // 匹配选项片段：行首或空格后接 A-D + 分隔符 + 内容
+        val pattern = Regex("""(?:^|(?<=\s))([A-Da-d])\s*[.、．:：]\s*(\S[^\n]*)""")
+        val matches = pattern.findAll(line).toList()
+
+        return matches.mapNotNull { match ->
+            val letter = match.groupValues[1].uppercaseChar()
+            var content = match.groupValues[2].trim()
+            // 去掉该片段后可能紧跟着的下一个选项字母内容
+            // 例如 "A.1 B.2" 中 A 的内容被匹配为 "1 B.2"，需要截断到下一个 B. 之前
+            val nextOptionIdx = content.indexOf(Regex("""\s+[B-Db-d]\s*[.、．:：]"""))
+            if (nextOptionIdx >= 0) {
+                content = content.substring(0, nextOptionIdx).trim()
+            }
+            if (letter in 'A'..'D' && content.length >= 1) {
+                OptionSegment(letter, content)
+            } else null
+        }
+    }
 
     /**
      * 对每一行进行角色判定。
      * 判定优先级：ANSWER > ANALYSIS > OPTION > STEM
      *
-     * OPTION 判定采用"连续出现"增强：
-     * 如果一行疑似选项（A-D 开头 + 分隔符），且后续行也是 A-D 开头，
-     * 则确认是选项组。单独出现的 "A. xxx" 可能只是题干的一部分。
+     * OPTION 判定采用片段级"连续出现"增强：
+     * - 一行内含 2+ 片段（如 "A.1 B.2"）→ 直接确认选项行
+     * - 一行内含 1 个片段 + 相邻行也有选项 → 确认为选项组
      */
     private fun classifyLines(rawLines: List<String>): List<Pair<LineRole, String>> {
         val lines = rawLines.map { it.trim() }.filter { it.isNotEmpty() }
         if (lines.isEmpty()) return emptyList()
 
-        // 先标记每行的"候选角色"
-        val candidates = lines.map { line -> LineCandidate(line) }
-
-        // 增强 OPTION 判定：连续 2+ 行都是候选选项 → 确认为选项组
-        confirmOptionGroups(candidates)
-
-        // 根据候选角色生成最终分类
-        return candidates.mapNotNull { c ->
-            val role = when {
-                c.isAnswer -> LineRole.ANSWER
-                c.isAnalysis -> LineRole.ANALYSIS
-                c.isOption -> LineRole.OPTION
-                else -> LineRole.STEM
-            }
-            val content = if (role == LineRole.STEM) {
-                cleanStemLine(c.line)
-            } else if (role == LineRole.OPTION) {
-                cleanOptionLine(c.line)
-            } else {
-                c.line
-            }
-            if (content.isBlank()) null else role to content
+        // 预拆分：每行拆成选项片段列表
+        val lineSegments = lines.map { line ->
+            LineSegments(
+                original = line,
+                segments = splitOptionsInLine(line)
+            )
         }
+
+        // 确认选项组（片段级）
+        confirmOptionGroupsWithSegments(lineSegments)
+
+        // 根据确认结果生成最终分类
+        return buildFinalClassification(lineSegments)
     }
 
-    private inner class LineCandidate(val line: String) {
-        var isOptionCandidate = false
-        var isOption = false       // 确认是选项（经连续性验证）
-        var isAnswer = false
-        var isAnalysis = false
+    /**
+     * 选项组确认逻辑（片段级）：
+     *
+     * 遍历每行，检查该行是否包含选项片段。
+     * 如果一行包含 2+ 个片段（如 "A.1 B.2"），直接确认为选项行。
+     * 如果一行只有 1 个片段，则需要周围有其他选项行（连续 2+ 行有选项）才确认。
+     *
+     * 这样可以同时处理：
+     * - 逐行一个：A.xxx\nB.xxx\n → 连续 2+ 行确认
+     * - AB一行：A.xxx B.xxx\nC.xxx D.xxx → 每行 2+ 片段直接确认
+     * - AB一行 CD一行：A.xxx B.xxx\nC.xxx D.xxx → 每行 2+ 片段直接确认
+     */
+    private fun confirmOptionGroupsWithSegments(lineSegments: List<LineSegments>) {
+        // 先把含 2+ 片段的行都标记为选项行
+        for (ls in lineSegments) {
+            if (ls.segments.size >= 2) {
+                ls.isOption = true
+            }
+        }
 
-        init {
-            isOptionCandidate = isOptionLike(line)
-            isAnswer = isAnswerLike(line)
-            isAnalysis = isAnalysisLike(line)
+        // 再处理含 1 个片段的行：需要连续 2+ 行都有选项才确认
+        var i = 0
+        while (i < lineSegments.size) {
+            val ls = lineSegments[i]
+
+            if (ls.segments.size == 1 && !ls.isOption) {
+                // 找连续包含选项片段的行
+                var j = i
+                while (j < lineSegments.size && lineSegments[j].segments.isNotEmpty()) {
+                    j++
+                }
+                val groupSize = j - i
+
+                if (groupSize >= 2) {
+                    for (k in i until j) {
+                        lineSegments[k].isOption = true
+                    }
+                }
+
+                // 跳过已处理的行（1片段组或非选项连续块）
+                i = j
+            } else {
+                i++
+            }
         }
     }
 
     /**
-     * 选项行特征检测（宽松）：
-     * - 行首（忽略空格、* 号）第一个字符是 A-D / a-d
-     * - 紧跟分隔符（. 、 ． : ： ） )）或空格
-     * - 后面有实际内容（长度 > 2）
+     * 根据片段级分类结果构建最终 (角色, 内容) 列表。
      *
-     * 但单独一行匹配不一定是选项（题干可能以 A 开头），
-     * 需要连续性验证。
+     * 关键：多片段选项行（如 "A.1 B.2"）展开为多个独立选项行，
+     * 每个选项内容不含字母前缀，由 buildOptionsJson 统一加回。
      */
-    private fun isOptionLike(line: String): Boolean {
-        // 去掉行首空格和星号
-        val s = line.trimStart().trimStart('*').trimStart()
-        if (s.length < 3) return false
+    private fun buildFinalClassification(lineSegments: List<LineSegments>): List<Pair<LineRole, String>> {
+        val result = mutableListOf<Pair<LineRole, String>>()
 
-        val first = s[0]
-        if (first !in 'A'..'D' && first !in 'a'..'d') return false
+        for (ls in lineSegments) {
+            val role = when {
+                ls.isOption -> LineRole.OPTION
+                isAnswerLike(ls.original) -> LineRole.ANSWER
+                isAnalysisLike(ls.original) -> LineRole.ANALYSIS
+                else -> LineRole.STEM
+            }
 
-        // 第二个字符应该是分隔符
-        if (s.length < 2) return false
-        val sep = s[1]
-        val isSep = sep in setOf('.', '、', '．', ':', '：', ')', '）', ' ')
-        if (!isSep) return false
-
-        // 如果是空格，后面必须有非字母内容（排除 "A brief..." 这种正常句子）
-        if (sep == ' ') {
-            val afterSpace = s.drop(2).trimStart()
-            if (afterSpace.isEmpty()) return false
-            return true
+            if (role == LineRole.OPTION) {
+                // 选项行：如果是多片段，每片段展开为一行
+                if (ls.segments.size >= 2) {
+                    for (seg in ls.segments) {
+                        val content = seg.content.trim()
+                        if (content.isNotBlank()) {
+                            result.add(role to content)
+                        }
+                    }
+                } else {
+                    // 单片段：直接清理原行
+                    val content = cleanOptionLine(ls.original)
+                    if (content.isNotBlank()) {
+                        result.add(role to content)
+                    }
+                }
+            } else {
+                val content = if (role == LineRole.STEM) {
+                    cleanStemLine(ls.original)
+                } else {
+                    ls.original
+                }
+                if (content.isNotBlank()) {
+                    result.add(role to content)
+                }
+            }
         }
 
-        return true
+        return result
     }
+
+    // ==================== 特征检测 ====================
 
     /**
      * 答案行特征检测：
@@ -188,40 +275,6 @@ class StructuredTxtParser : QuizParser {
      */
     private fun isAnalysisLike(line: String): Boolean {
         return Regex("^(解析|分析|答案解析|试题解析)\\s*[:：]").containsMatchIn(line)
-    }
-
-    /**
-     * 增强 OPTION 判定：连续 2+ 行都是候选选项 → 确认为选项组。
-     *
-     * 这是核心的结构识别逻辑：不是看某一行是否像选项，
-     * 而是看是否有一组连续的行，每行都以递增的 A/B/C/D 开头。
-     */
-    private fun confirmOptionGroups(candidates: List<LineCandidate>) {
-        var i = 0
-        while (i < candidates.size) {
-            if (!candidates[i].isOptionCandidate) {
-                i++
-                continue
-            }
-
-            // 从 i 开始，找连续的候选选项行
-            val groupStart = i
-            var j = i + 1
-            while (j < candidates.size && candidates[j].isOptionCandidate) {
-                j++
-            }
-            val groupSize = j - groupStart
-
-            if (groupSize >= 2) {
-                // 连续 2+ 行 → 确认为选项组
-                for (k in groupStart until j) {
-                    candidates[k].isOption = true
-                }
-            }
-            // 即使只有 1 行候选选项，但如果前后有题干行和答案行，
-            // 也可能是单选项的判断题，暂不确认（留给后续逻辑处理）
-            i = j
-        }
     }
 
     // ==================== 内容清理 ====================
