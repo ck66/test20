@@ -495,6 +495,7 @@ fun TextSearchScreen(
                 }
 
                 is SearchUiState.Recognizing -> {}
+                is SearchUiState.Cropping -> {}
             }
         }
     }
