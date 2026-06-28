@@ -16,13 +16,14 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationCompat
@@ -66,7 +67,7 @@ class FloatingBallService : Service() {
     companion object {
         const val CHANNEL_ID = "floating_ball_channel"
         const val NOTIFICATION_ID = 2001
-        private const val BALL_SIZE_DP = 56
+        private const val BALL_SIZE_DP = 28
 
         fun start(context: Context) {
             val intent = Intent(context, FloatingBallService::class.java)
@@ -182,7 +183,8 @@ class FloatingBallService : Service() {
     }
 
     private fun showFloatingBall() {
-        val ballSize = (BALL_SIZE_DP * resources.displayMetrics.density).toInt()
+        // 触摸区域 44dp，不是视觉的 28dp
+        val ballSize = (44 * resources.displayMetrics.density).toInt()
 
         // 创建 LifecycleOwner 注入到 ComposeView，否则在系统窗口（WindowManager）中
         // Compose 找不到 ViewTreeLifecycleOwner 会崩溃
@@ -196,13 +198,25 @@ class FloatingBallService : Service() {
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
                 DusouTheme {
+                    // 触摸区域 44dp（Material Design 推荐最小触摸尺寸）
                     Box(
-                        modifier = Modifier
-                            .size(BALL_SIZE_DP.dp)
-                            .clip(CircleShape)
-                            .background(md_theme_light_primary)
+                        modifier = Modifier.size(44.dp)
                     ) {
-                        // Invisible touch layer for drag/click handling via AndroidView
+                        // 视觉圆环 28dp，居中
+                        Canvas(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .align(Alignment.Center)
+                        ) {
+                            val strokeWidth = 3.dp.toPx()
+                            val radius = (size.minDimension / 2f) - (strokeWidth / 2f)
+                            drawCircle(
+                                color = md_theme_light_primary.copy(alpha = 0.6f),
+                                radius = radius,
+                                style = Stroke(width = strokeWidth)
+                            )
+                        }
+                        // 触摸层占满 44dp
                         AndroidView(
                             factory = { ctx ->
                                 View(ctx).apply {
@@ -211,7 +225,7 @@ class FloatingBallService : Service() {
                                     }
                                 }
                             },
-                            modifier = Modifier.size(BALL_SIZE_DP.dp)
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }

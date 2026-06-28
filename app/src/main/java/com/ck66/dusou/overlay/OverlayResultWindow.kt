@@ -164,6 +164,13 @@ private fun OverlayResultContent(
     var analysisExpanded by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
 
+    // 带透明度的文字颜色，让弹窗文字也能透出下方内容
+    val textAlpha = 0.7f
+    val primaryColor = MaterialTheme.colorScheme.primary.copy(alpha = textAlpha)
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha)
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = textAlpha)
+    val errorColor = MaterialTheme.colorScheme.error.copy(alpha = textAlpha)
+
     androidx.compose.runtime.LaunchedEffect(Unit) {
         visible = true
     }
@@ -181,7 +188,7 @@ private fun OverlayResultContent(
                 .wrapContentHeight()
                 .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.7f).dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
                 .padding(16.dp)
         ) {
             // Title bar
@@ -199,10 +206,11 @@ private fun OverlayResultContent(
                         text = "搜索结果",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = onSurfaceColor,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = onDismiss) {
-                        Text("关闭", fontSize = 13.sp)
+                        Text("关闭", fontSize = 13.sp, color = primaryColor)
                     }
                 }
             }
@@ -213,8 +221,7 @@ private fun OverlayResultContent(
             Text(
                 text = "相似度 ${"%.0f".format(matchResult.similarity * 100)}%",
                 style = MaterialTheme.typography.labelMedium,
-                color = if (matchResult.matched) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.error
+                color = if (matchResult.matched) primaryColor else errorColor
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -224,6 +231,7 @@ private fun OverlayResultContent(
                 Text(
                     text = question.stem,
                     style = MaterialTheme.typography.bodyMedium,
+                    color = onSurfaceColor,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -272,16 +280,14 @@ private fun OverlayResultContent(
                                 text = "$label.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (isCorrectAnswer) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isCorrectAnswer) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface,
+                                color = if (isCorrectAnswer) primaryColor else onSurfaceColor,
                                 modifier = Modifier.width(24.dp)
                             )
                             Text(
                                 text = option,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (isCorrectAnswer) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isCorrectAnswer) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface,
+                                color = if (isCorrectAnswer) primaryColor else onSurfaceColor,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -298,13 +304,13 @@ private fun OverlayResultContent(
                     Text(
                         text = "答案：",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onSurfaceVariantColor
                     )
                     Text(
                         text = question.answer,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = primaryColor
                     )
                 }
 
@@ -314,7 +320,8 @@ private fun OverlayResultContent(
                     TextButton(onClick = { analysisExpanded = !analysisExpanded }) {
                         Text(
                             if (analysisExpanded) "收起解析" else "展开解析",
-                            fontSize = 13.sp
+                            fontSize = 13.sp,
+                            color = primaryColor
                         )
                     }
                     if (analysisExpanded) {
@@ -327,7 +334,7 @@ private fun OverlayResultContent(
                             Text(
                                 text = question.analysis ?: "",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = onSurfaceVariantColor
                             )
                         }
                     }
@@ -341,25 +348,25 @@ private fun OverlayResultContent(
                         onClick = { onCopyAnswer(question.answer) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                         )
                     ) {
-                        Text("复制答案", fontSize = 14.sp)
+                        Text("复制答案", fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     TextButton(onClick = onDismiss) {
-                        Text("关闭", fontSize = 14.sp)
+                        Text("关闭", fontSize = 14.sp, color = primaryColor)
                     }
                 }
             } else {
                 Text(
                     text = "未找到匹配题目",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error
+                    color = errorColor
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 TextButton(onClick = onDismiss) {
-                    Text("关闭")
+                    Text("关闭", color = primaryColor)
                 }
             }
         }
